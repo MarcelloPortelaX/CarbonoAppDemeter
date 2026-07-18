@@ -1,0 +1,6 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StyleSheet, Text, View } from 'react-native';
+import { useDemeterTheme } from '../theme/ThemeProvider';
+import { SurfaceCard } from './SurfaceCard';
+export function InfoRowCard({icon,title,value,subtitle,tone='success'}:{icon:keyof typeof MaterialCommunityIcons.glyphMap;title:string;value:string;subtitle:string;tone?:'success'|'warning'}){const{theme}=useDemeterTheme();const color=tone==='warning'?theme.colors.warning:theme.colors.success;return <SurfaceCard style={styles.card}><View style={styles.titleRow}><MaterialCommunityIcons name={icon} size={22} color={theme.colors.icon}/><Text style={[styles.title,{color:theme.colors.text}]}>{title}</Text><MaterialCommunityIcons name="chevron-right" size={23} color={theme.colors.textMuted}/></View><Text style={[styles.value,{color}]}>{value}</Text><Text style={[styles.subtitle,{color:theme.colors.textMuted}]}>{subtitle}</Text></SurfaceCard>}
+const styles=StyleSheet.create({card:{gap:7},titleRow:{flexDirection:'row',alignItems:'center',gap:8},title:{fontFamily:'Inter_600SemiBold',fontSize:15,flex:1},value:{fontFamily:'Inter_700Bold',fontSize:18},subtitle:{fontFamily:'Inter_400Regular',fontSize:12}});
