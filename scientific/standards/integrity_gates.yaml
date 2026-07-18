@@ -1,0 +1,23 @@
+version: 1.0.0
+gates:
+  additionality:
+    status: required
+    evidence: []
+  permanence:
+    status: required
+    evidence: []
+  robust_quantification:
+    status: required
+    evidence: []
+  no_double_counting:
+    status: required
+    evidence: []
+  legal_rights:
+    status: required
+    evidence: []
+  safeguards:
+    status: required
+    evidence: []
+  third_party_validation_verification:
+    status: external_required
+    evidence: []

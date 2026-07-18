@@ -1,0 +1,16 @@
+id: verra-vm0042
+version: '2.2'
+state: future_reference_only
+calculation_enabled: false
+activity_family: improved_agricultural_land_management
+source_id: verra-vm0042-v2.2
+corrections_clarifications_effective: '2026-06-11'
+mvp_use:
+  allowed:
+    - classify_future_path
+    - collect_management_history
+    - flag_soil_sampling_and_model_requirements
+  prohibited:
+    - quantify_soil_carbon
+    - display_credit_estimate
+    - claim_methodology_conformance

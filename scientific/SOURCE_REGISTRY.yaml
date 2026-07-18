@@ -1,0 +1,53 @@
+registry_version: 1.0.0
+last_reviewed: 2026-07-18
+sources:
+- id: ipcc-2006-afolu-v4
+  organization: IPCC
+  title: 2006 IPCC Guidelines, Volume 4 — Agriculture, Forestry and Other Land Use
+  url: https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol4.html
+  role: scientific_foundation
+  status: active
+- id: ipcc-2019-refinement-afolu
+  organization: IPCC
+  title: 2019 Refinement, Volume 4 — AFOLU
+  url: https://www.ipcc-nggip.iges.or.jp/public/2019rf/vol4.html
+  role: scientific_refinement
+  status: active
+  note: Complements and updates the 2006 Guidelines; does not replace them.
+- id: verra-vm0047-v1.1
+  organization: Verra
+  title: VM0047 Afforestation, Reforestation, and Revegetation, v1.1
+  url: https://verra.org/methodologies/vm0047-afforestation-reforestation-and-revegetation-v1-1/
+  role: candidate_crediting_methodology
+  status: reference_only
+- id: verra-vcs-v5
+  organization: Verra
+  title: Verified Carbon Standard Version 5
+  url: https://verra.org/programs/verified-carbon-standard/verified-carbon-standard-version-5/
+  role: program_requirements
+  status: transition
+- id: iso-14064-2-2019
+  organization: ISO
+  title: ISO 14064-2:2019
+  url: https://www.iso.org/standard/66454.html
+  role: project_level_mrv_principles
+  status: active
+- id: icvcm-ccp
+  organization: ICVCM
+  title: Core Carbon Principles
+  url: https://icvcm.org/core-carbon-principles/
+  role: integrity_benchmark
+  status: active
+- id: brasil-lei-15042-2024
+  organization: Presidência da República do Brasil
+  title: Lei nº 15.042, de 11 de dezembro de 2024
+  url: https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2024/lei/L15042.htm
+  role: legal_context
+  status: active
+- id: verra-vm0042-v2.2
+  organization: Verra
+  title: VM0042 Improved Agricultural Land Management, v2.2
+  url: https://verra.org/methodologies/vm0042-improved-agricultural-land-management-v2-2/
+  role: future_candidate_methodology
+  status: reference_only
+  note: Corrections and Clarifications effective 2026-06-11 must be considered.

@@ -1,0 +1,21 @@
+registry_version: 0.1.0
+updated_at: 2026-07-17
+entries:
+  - id: verra-vm0047-v1.1-reference
+    title: VM0047 Afforestation, Reforestation, and Revegetation
+    publisher: Verra
+    version: "1.1"
+    canonical_url: https://verra.org/methodologies/vm0047-afforestation-reforestation-and-revegetation-v1-1/
+    purpose: governance_reference
+    implemented: false
+    enabled_for_credit_calculation: false
+    notes:
+      - Aplicável a atividades ARR conforme condições da metodologia.
+      - O MVP não implementa baseline dinâmico, adicionalidade, leakage, uncertainty ou verificação.
+  - id: ipcc-2006-afolu-reference
+    title: 2006 IPCC Guidelines for National Greenhouse Gas Inventories — AFOLU
+    publisher: IPCC
+    version: "2006"
+    purpose: units_and_accounting_reference
+    implemented: false
+    enabled_for_credit_calculation: false

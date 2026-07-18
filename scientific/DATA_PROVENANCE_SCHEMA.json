@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScientificDatum",
+  "type": "object",
+  "required": ["datum_id", "value", "unit", "source_type", "source_id", "observed_at", "quality_flag"],
+  "properties": {
+    "datum_id": { "type": "string" },
+    "value": { "type": ["number", "string", "boolean", "null"] },
+    "unit": { "type": "string" },
+    "source_type": { "enum": ["field_observation", "user_declaration", "remote_sensing", "document", "derived", "external_dataset"] },
+    "source_id": { "type": "string" },
+    "method_version": { "type": ["string", "null"] },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "geometry_id": { "type": ["string", "null"] },
+    "uncertainty": { "type": ["number", "null"], "minimum": 0 },
+    "quality_flag": { "enum": ["unverified", "screened", "reviewed", "verified", "rejected"] },
+    "notes": { "type": "string" }
+  }
+}

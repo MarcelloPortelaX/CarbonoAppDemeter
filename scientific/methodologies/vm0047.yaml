@@ -1,0 +1,31 @@
+id: verra-vm0047
+version: '1.1'
+state: reference_only
+calculation_enabled: false
+activity_family: ARR
+approaches:
+  - area_based
+  - census_based
+source_id: verra-vm0047-v1.1
+mvp_use:
+  allowed:
+    - classify_candidate_activity
+    - collect_required_evidence
+    - show_methodology_review_pending
+  prohibited:
+    - issue_credits
+    - claim_certification
+    - calculate_without_full_methodology
+required_gates:
+  - applicability
+  - land_and_carbon_rights
+  - baseline
+  - additionality
+  - project_boundary
+  - pools_and_sources
+  - leakage
+  - permanence_and_reversal_risk
+  - monitoring_plan
+  - uncertainty
+  - safeguards
+  - independent_validation_verification

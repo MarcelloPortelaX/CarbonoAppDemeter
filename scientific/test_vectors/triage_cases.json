@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "note": "Casos sintéticos; não são propriedades reais nem quantificação de carbono.",
+  "cases": [
+    {
+      "id": "degraded-pasture-with-docs",
+      "input": {
+        "land_use": "degraded_pasture",
+        "has_possession_proof": true,
+        "intends_restoration": true,
+        "recent_clearing": false
+      },
+      "expected_status": "potential"
+    },
+    {
+      "id": "native-vegetation-no-intervention",
+      "input": {
+        "land_use": "native_vegetation",
+        "has_possession_proof": true,
+        "intends_restoration": false,
+        "recent_clearing": false
+      },
+      "expected_status": "needs_review"
+    },
+    {
+      "id": "recent-clearing-block",
+      "input": {
+        "land_use": "agriculture",
+        "has_possession_proof": true,
+        "intends_restoration": true,
+        "recent_clearing": true
+      },
+      "expected_status": "not_ready"
+    }
+  ]
+}
