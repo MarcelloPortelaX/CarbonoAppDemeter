@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demeter.local/schemas/property.schema.json",
+  "title": "Property",
+  "type": "object",
+  "required": ["id", "name", "municipality", "points", "land_use"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 3, "maxLength": 120 },
+    "municipality": { "type": "string", "minLength": 2, "maxLength": 160 },
+    "land_use": { "enum": ["degraded_pasture", "agriculture", "abandoned", "agroforestry", "native_vegetation"] },
+    "points": {
+      "type": "array", "minItems": 3,
+      "items": { "type": "object", "required": ["latitude", "longitude"], "properties": { "latitude": { "type": "number", "minimum": -90, "maximum": 90 }, "longitude": { "type": "number", "minimum": -180, "maximum": 180 } } }
+    }
+  }
+}
