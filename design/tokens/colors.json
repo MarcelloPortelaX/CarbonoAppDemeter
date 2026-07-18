@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "name": "Demeter Carbono Dual Theme"
+  },
+  "brand": {
+    "neon": "#39FF68",
+    "neonStrong": "#15F34F",
+    "neonSoft": "#8DFFAA",
+    "forest": "#073C22",
+    "forestDeep": "#031B11",
+    "warning": "#FF9D00",
+    "danger": "#FF5C67"
+  },
+  "light": {
+    "background": "#F6F8F6",
+    "surface": "#FFFFFF",
+    "surfaceAlt": "#EFF4F0",
+    "surfaceStrong": "#073C22",
+    "text": "#0A1B12",
+    "textMuted": "#647068",
+    "border": "#D8E2DA",
+    "borderStrong": "#133C27",
+    "shadow": "rgba(3,27,17,0.12)",
+    "mapSheet": "#FFFFFF"
+  },
+  "dark": {
+    "background": "#020A07",
+    "surface": "#07110D",
+    "surfaceAlt": "#0B1711",
+    "surfaceStrong": "#041B10",
+    "text": "#F5FFF7",
+    "textMuted": "#A6B5AB",
+    "border": "#183425",
+    "borderStrong": "#2B7D47",
+    "shadow": "rgba(0,0,0,0.48)",
+    "mapSheet": "#07110D"
+  }
+}

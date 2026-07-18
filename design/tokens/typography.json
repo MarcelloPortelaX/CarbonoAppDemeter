@@ -1,0 +1,52 @@
+{
+  "family": {
+    "primary": "Inter",
+    "numeric": "Inter"
+  },
+  "styles": {
+    "display": {
+      "size": 32,
+      "lineHeight": 38,
+      "weight": 800,
+      "letterSpacing": -0.8
+    },
+    "title1": {
+      "size": 24,
+      "lineHeight": 30,
+      "weight": 800,
+      "letterSpacing": -0.4
+    },
+    "title2": {
+      "size": 20,
+      "lineHeight": 26,
+      "weight": 700,
+      "letterSpacing": -0.2
+    },
+    "body": {
+      "size": 15,
+      "lineHeight": 22,
+      "weight": 400
+    },
+    "bodyStrong": {
+      "size": 15,
+      "lineHeight": 22,
+      "weight": 600
+    },
+    "caption": {
+      "size": 12,
+      "lineHeight": 16,
+      "weight": 500
+    },
+    "metric": {
+      "size": 28,
+      "lineHeight": 32,
+      "weight": 800,
+      "letterSpacing": -0.6
+    },
+    "button": {
+      "size": 15,
+      "lineHeight": 20,
+      "weight": 700
+    }
+  }
+}

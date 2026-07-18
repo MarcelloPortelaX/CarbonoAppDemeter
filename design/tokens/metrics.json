@@ -1,0 +1,42 @@
+{
+  "spacing": {
+    "xxs": 4,
+    "xs": 8,
+    "sm": 12,
+    "md": 16,
+    "lg": 20,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 40
+  },
+  "radius": {
+    "xs": 10,
+    "sm": 14,
+    "md": 18,
+    "lg": 24,
+    "xl": 30,
+    "pill": 999
+  },
+  "stroke": {
+    "hairline": 1,
+    "default": 1.25,
+    "strong": 1.75,
+    "mapPolygon": 3
+  },
+  "touch": {
+    "minimum": 44,
+    "preferred": 48
+  },
+  "elevation": {
+    "card": 2,
+    "floating": 6,
+    "sheet": 12
+  },
+  "layout": {
+    "screenPadding": 16,
+    "cardGap": 12,
+    "bottomNavHeight": 72,
+    "headerHeight": 64,
+    "maxContentWidth": 520
+  }
+}

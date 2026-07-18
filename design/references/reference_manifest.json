@@ -1,0 +1,54 @@
+{
+  "version": "1.1.0",
+  "items": [
+    {
+      "id": "demeter-brand-symbol",
+      "path": "design/references/demeter-brand-symbol.png",
+      "width": 1280,
+      "height": 1280,
+      "sha256": "ec2f18d019d0fcdcf119f9c21b4b48c50159e136fddbf0117435332748db49ef"
+    },
+    {
+      "id": "home-dark-screen",
+      "path": "design/references/screens/home-dark-screen.png",
+      "width": 359,
+      "height": 868,
+      "sha256": "3a98ead9f1cb4a64892770f3db387b776f0d49c15f67162769fef86be6dd7a3e"
+    },
+    {
+      "id": "home-light-screen",
+      "path": "design/references/screens/home-light-screen.png",
+      "width": 341,
+      "height": 848,
+      "sha256": "57d883a3a5f159a4d9ab7c84ae12aa7eb1d5831419d7f2f3512cecbf6356177f"
+    },
+    {
+      "id": "map-dark-screen",
+      "path": "design/references/screens/map-dark-screen.png",
+      "width": 359,
+      "height": 868,
+      "sha256": "ccd265d1987135b73957c0c86f3d1a75d274f3a8a0e8fa7bfd4a61511f9ae372"
+    },
+    {
+      "id": "map-light-screen",
+      "path": "design/references/screens/map-light-screen.png",
+      "width": 349,
+      "height": 848,
+      "sha256": "c1ff5f4d09cd3c31965634a2a86e52eebc41b9d98e291cf879143344011042de"
+    },
+    {
+      "id": "passport-dark-screen",
+      "path": "design/references/screens/passport-dark-screen.png",
+      "width": 361,
+      "height": 868,
+      "sha256": "4f13954e08bad0347ecc7bf9cb6e652f3f963e100f87ba59b64b6aef3aaf3b35"
+    },
+    {
+      "id": "passport-light-screen",
+      "path": "design/references/screens/passport-light-screen.png",
+      "width": 350,
+      "height": 848,
+      "sha256": "e55fae794e110f5ca64c6ce4e18a29ef6d2a6ce587d752714ef10212d4c8695b"
+    }
+  ]
+}
