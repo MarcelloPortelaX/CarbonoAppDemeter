@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: demeter_carbono
+      POSTGRES_USER: demeter
+      POSTGRES_PASSWORD: demeter
+    ports: ["5432:5432"]
+    volumes:
+      - demeter_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demeter -d demeter_carbono"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ../services/api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://demeter:demeter@postgres:5432/demeter_carbono
+      CORS_ORIGINS: http://localhost:8081,http://localhost:19006
+      DEMO_MODE: "true"
+    ports: ["8000:8000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  demeter_postgres:
