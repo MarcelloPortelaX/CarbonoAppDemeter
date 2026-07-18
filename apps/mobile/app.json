@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Demeter Carbono",
+    "slug": "demeter-carbono",
+    "owner": "demeterrealm",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "scheme": "demetercarbono",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/brand-symbol.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.demeter.carbono",
+      "userInterfaceStyle": "automatic"
+    },
+    "android": {
+      "package": "com.demeter.carbono",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand-symbol.png",
+        "backgroundColor": "#020A07"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "userInterfaceStyle": "automatic"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Demeter usa sua localização para facilitar o cadastro da área."
+        }
+      ],
+      "expo-system-ui",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand-symbol.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#F6F8F6",
+          "dark": {
+            "image": "./assets/brand-symbol.png",
+            "backgroundColor": "#020A07"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "http://10.0.2.2:8000/api/v1",
+      "eas": {
+        "projectId": "687b4ec3-9a18-40fc-b7f9-b12babbe1d71"
+      }
+    }
+  }
+}
