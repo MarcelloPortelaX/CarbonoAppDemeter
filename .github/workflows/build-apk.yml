@@ -68,10 +68,12 @@ jobs:
       - name: Android Smoke Test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 31
-          target: playstore
-          arch: x86_64
-          profile: pixel
+          api-level: 29
+          target: default
+          arch: x86
+          profile: Nexus 6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             echo "Installing APK..."
             adb install -r apps/mobile/dist/demeter-carbono.apk
