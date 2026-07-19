@@ -1,19 +1,14 @@
+from uuid import uuid4
 from app.application.passport_service import build_passport
 from app.domain.eligibility import assess
 from app.domain.integrity import GateStatus, IntegrityGateSet
 from app.domain.provenance import ResultMaturity
-from app.domain.schemas import LandUse, Position, PropertyCreate
+from app.domain.schemas import LandUse, AssessmentInput
 
 
-def sample_property() -> PropertyCreate:
-    return PropertyCreate(
-        name="Área sintética",
-        municipality="Lavras",
-        points=[
-            Position(latitude=-21.24, longitude=-44.99),
-            Position(latitude=-21.24, longitude=-44.98),
-            Position(latitude=-21.25, longitude=-44.98),
-        ],
+def sample_property() -> AssessmentInput:
+    return AssessmentInput(
+        property_id=uuid4(),
         land_use=LandUse.DEGRADED_PASTURE,
         has_possession_proof=True,
         intends_restoration=True,

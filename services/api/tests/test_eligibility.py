@@ -1,23 +1,18 @@
+from uuid import uuid4
 from app.domain.eligibility import RULESET_VERSION, assess
-from app.domain.schemas import EligibilityStatus, LandUse, Position, PropertyCreate
+from app.domain.schemas import EligibilityStatus, LandUse, AssessmentInput
 
 
 def candidate(**overrides):
     data = {
-        "name": "Área Piloto",
-        "municipality": "Lavras - MG",
-        "points": [
-            Position(latitude=-21.2, longitude=-44.9),
-            Position(latitude=-21.21, longitude=-44.91),
-            Position(latitude=-21.22, longitude=-44.9),
-        ],
+        "property_id": uuid4(),
         "land_use": LandUse.DEGRADED_PASTURE,
         "has_possession_proof": True,
         "intends_restoration": True,
         "recent_clearing": False,
     }
     data.update(overrides)
-    return PropertyCreate(**data)
+    return AssessmentInput(**data)
 
 
 def test_candidate_has_preliminary_potential() -> None:

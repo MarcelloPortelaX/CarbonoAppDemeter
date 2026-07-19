@@ -13,7 +13,7 @@ for path in ROOT.rglob("*.json"):
         continue
     try:
         json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except json.JSONDecodeError as exc:
         errors.append(f"JSON {path.relative_to(ROOT)}: {exc}")
 
 for pattern in ("*.yaml", "*.yml"):
@@ -22,7 +22,7 @@ for pattern in ("*.yaml", "*.yml"):
             continue
         try:
             yaml.safe_load(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except yaml.YAMLError as exc:
             errors.append(f"YAML {path.relative_to(ROOT)}: {exc}")
 
 if errors:
