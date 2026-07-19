@@ -25,14 +25,23 @@ class Position(BaseModel):
 
 
 class PropertyCreate(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: UUID
     name: str = Field(min_length=3, max_length=120)
     municipality: str = Field(min_length=2, max_length=160)
-    points: list[Position] = Field(min_length=3, max_length=5000)
     land_use: LandUse
-    has_possession_proof: bool = False
-    intends_restoration: bool = False
-    recent_clearing: bool = False
+
+
+class PropertyRead(BaseModel):
+    id: UUID
+    name: str
+    municipality: str
+    land_use: LandUse
+    version: int
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class BoundaryCreate(BaseModel):
+    points: list[Position] = Field(min_length=3, max_length=5000)
 
     @model_validator(mode="after")
     def validate_distinct_points(self):
@@ -42,9 +51,22 @@ class PropertyCreate(BaseModel):
         return self
 
 
-class PropertyRead(PropertyCreate):
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+class BoundaryVersionRead(BaseModel):
+    id: UUID
+    property_id: UUID
+    version: int
+    area_ha: float
+    perimeter_km: float
+    input_hash: str
+    created_at: datetime
 
+
+class AssessmentInput(BaseModel):
+    property_id: UUID
+    land_use: LandUse
+    has_possession_proof: bool = False
+    intends_restoration: bool = False
+    recent_clearing: bool = False
 
 class AssessmentRead(BaseModel):
     id: UUID = Field(default_factory=uuid4)

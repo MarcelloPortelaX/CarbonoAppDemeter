@@ -1,17 +1,17 @@
 import hashlib
 import json
 
-from app.domain.schemas import AssessmentRead, EligibilityStatus, LandUse, PropertyCreate
+from app.domain.schemas import AssessmentRead, EligibilityStatus, LandUse, AssessmentInput
 
 RULESET_VERSION = "demeter-triage-0.1.0"
 
 
-def canonical_hash(value: PropertyCreate) -> str:
+def canonical_hash(value: AssessmentInput) -> str:
     payload = json.dumps(value.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def assess(property_data: PropertyCreate) -> AssessmentRead:
+def assess(property_data: AssessmentInput) -> AssessmentRead:
     score = 0
     reasons: list[str] = []
     pending: list[str] = []
@@ -56,7 +56,7 @@ def assess(property_data: PropertyCreate) -> AssessmentRead:
         status = EligibilityStatus.POTENTIAL
 
     return AssessmentRead(
-        property_id=property_data.id,
+        property_id=property_data.property_id,
         status=status,
         score=score,
         reasons=reasons,

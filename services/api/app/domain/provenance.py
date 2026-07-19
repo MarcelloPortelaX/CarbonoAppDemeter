@@ -43,6 +43,6 @@ class CalculationProvenance(BaseModel):
         return self.maturity == ResultMaturity.ISSUED and self.reviewer_id is not None
 
 
-def canonical_hash(payload: Any) -> str:
-    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+def canonical_hash(document: Any) -> str:
+    serialized = json.dumps(document, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
