@@ -84,6 +84,41 @@ jobs:
           
           echo "APK validated successfully."
 
+      - name: Android Smoke Test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: playstore
+          arch: x86_64
+          profile: pixel
+          script: |
+            echo "Installing APK..."
+            adb install -r apps/mobile/dist/demeter-carbono.apk
+            echo "Starting App..."
+            adb shell monkey -p com.demeter.carbono -c android.intent.category.LAUNCHER 1
+            echo "Waiting for app to launch..."
+            sleep 15
+            echo "Checking process..."
+            adb logcat -d > logcat.txt
+            if ! adb shell pidof com.demeter.carbono > /dev/null; then
+              echo "Error: App process is not running!"
+              cat logcat.txt
+              exit 1
+            fi
+            if grep -q "FATAL EXCEPTION\|AndroidRuntime\|SIGABRT\|SIGSEGV" logcat.txt; then
+              echo "Error: Critical crash found in logcat!"
+              cat logcat.txt
+              exit 1
+            fi
+            echo "Smoke test passed!"
+
+      - name: Upload Logcat on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logcat-failure
+          path: logcat.txt
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:

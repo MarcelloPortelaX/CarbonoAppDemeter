@@ -31,6 +31,12 @@ jobs:
       - name: Expo Doctor
         working-directory: ./apps/mobile
         run: npx expo-doctor
+      - name: Expo Install Check
+        working-directory: ./apps/mobile
+        run: npx expo install --check
+      - name: Android Export Check
+        working-directory: ./apps/mobile
+        run: npx expo export --platform android --clear
 
   backend:
     name: Backend Tests
