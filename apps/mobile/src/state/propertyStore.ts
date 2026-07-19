@@ -27,6 +27,8 @@ type PropertyState = {
   addBoundaryPoint: (propertyId: string, point: Coordinate) => void;
   undoBoundaryPoint: (propertyId: string) => void;
   confirmBoundary: (propertyId: string) => void;
+  removeOperation: (operationId: string) => void;
+  updateSyncStatus: (propertyId: string, status: SyncStatus) => void;
 };
 
 export const usePropertyStore = create<PropertyState>()(
@@ -100,6 +102,16 @@ export const usePropertyStore = create<PropertyState>()(
             },
           },
           outbox: queueOperation(state.outbox, propertyId, 'confirm_boundary'),
+        })),
+      removeOperation: (operationId) =>
+        set((state) => ({
+          outbox: state.outbox.filter((op) => op.id !== operationId),
+        })),
+      updateSyncStatus: (propertyId, syncStatus) =>
+        set((state) => ({
+          properties: state.properties.map((p) =>
+            p.id === propertyId ? { ...p, syncStatus } : p
+          ),
         })),
     }),
     {

@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { BrandGlyph } from '../../src/components/BrandGlyph';
 import { EmptyState } from '../../src/components/EmptyState';
@@ -11,12 +12,24 @@ import { StepProgress } from '../../src/components/StepProgress';
 import { SurfaceCard } from '../../src/components/SurfaceCard';
 import { usePropertyStore } from '../../src/state/propertyStore';
 import { useDemeterTheme } from '../../src/theme/ThemeProvider';
+import { getPassport } from '../../src/services/api';
 
 export default function Passport() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useDemeterTheme();
   const property = usePropertyStore((state) => state.properties.find((item) => item.id === id));
-  const passport = usePropertyStore((state) => (id ? state.passports[id] : undefined));
+  const localPassport = usePropertyStore((state) => (id ? state.passports[id] : undefined));
+  const [remotePassport, setRemotePassport] = useState<any>(null);
+
+  useEffect(() => {
+    if (id && property?.syncStatus === 'synced') {
+      getPassport(id)
+        .then((data) => setRemotePassport(data))
+        .catch((e) => console.warn('Failed to load remote passport:', e));
+    }
+  }, [id, property?.syncStatus]);
+
+  const passport = remotePassport || localPassport;
 
   const sharePassport = async () => {
     if (!property || !passport) return;
