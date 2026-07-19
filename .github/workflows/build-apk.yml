@@ -69,14 +69,26 @@ jobs:
           cp "$APK_PATH" ../dist/demeter-carbono.apk
           cd ..
 
+      - name: Upload Artifact Candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demeter-carbono-apk-candidate
+          path: apps/mobile/dist/demeter-carbono.apk
+          if-no-files-found: ignore
+
       - name: Setup Android SDK Build-Tools
         uses: android-actions/setup-android@v3
 
       - name: Validate APK
         working-directory: apps/mobile
         run: |
+          set -Eeuo pipefail
           APK="dist/demeter-carbono.apk"
-          test -f "$APK" || (echo "Error: APK missing" && exit 1)
+          if [ ! -f "$APK" ]; then
+            echo "Error: APK missing"
+            exit 1
+          fi
           
           FILE_SIZE=$(stat -c%s "$APK")
           if [ "$FILE_SIZE" -lt 1000000 ]; then
@@ -84,26 +96,47 @@ jobs:
             exit 1
           fi
           
-          file "$APK" | grep -i "zip archive" || (echo "Error: Not a valid ZIP file" && exit 1)
-          unzip -t "$APK" > /dev/null || (echo "Error: ZIP integrity check failed" && exit 1)
+          FILE_DESCRIPTION="$(file -b "$APK")"
+          echo "File type: $FILE_DESCRIPTION"
           
-          apksigner verify --print-certs "$APK" || (echo "Error: APK signature verification failed" && exit 1)
+          if ! echo "$FILE_DESCRIPTION" | grep -Eiq "Android package|APK|Zip archive"; then
+            echo "Error: File is not recognized as an Android APK or ZIP archive."
+            exit 1
+          fi
           
-          aapt dump badging "$APK" > dist/apk-metadata.txt
-          grep -q "package: name='com.demeter.carbono'" dist/apk-metadata.txt || (echo "Error: Incorrect package name" && exit 1)
-          grep -q "launchable-activity" dist/apk-metadata.txt || (echo "Error: No launchable activity found" && exit 1)
+          unzip -t "$APK" > /dev/null
+          
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          
+          "$APKSIGNER" verify --print-certs "$APK"
+          "$AAPT" dump badging "$APK" > dist/apk-metadata.txt
+          
+          if ! grep -q "package: name='com.demeter.carbono'" dist/apk-metadata.txt; then
+            echo "Error: Incorrect package name"
+            exit 1
+          fi
+          
+          if ! grep -q "launchable-activity" dist/apk-metadata.txt; then
+            echo "Error: No launchable activity found"
+            exit 1
+          fi
           
           sha256sum "$APK" > dist/demeter-carbono.apk.sha256
           echo "APK validated successfully"
 
-      - name: Upload Artifact Candidate
+      - name: Upload APK Metadata
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: demeter-carbono-apk-candidate
+          name: demeter-carbono-apk-metadata
           path: |
-            apps/mobile/dist/demeter-carbono.apk
             apps/mobile/dist/demeter-carbono.apk.sha256
             apps/mobile/dist/apk-metadata.txt
+          if-no-files-found: ignore
 
   android_smoke_test:
     needs: build_apk
@@ -158,6 +191,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: demeter-carbono-apk-candidate
+          path: apps/mobile/dist
+
+      - name: Download Artifact Metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: demeter-carbono-apk-metadata
           path: apps/mobile/dist
 
       - name: Determine Tag
