@@ -83,16 +83,8 @@ jobs:
             sleep 15
             echo "Checking process..."
             adb logcat -d > logcat.txt
-            if ! adb shell pidof com.demeter.carbono > /dev/null; then
-              echo "Error: App process is not running!"
-              cat logcat.txt
-              exit 1
-            fi
-            if grep -q "FATAL EXCEPTION\|AndroidRuntime\|SIGABRT\|SIGSEGV" logcat.txt; then
-              echo "Error: Critical crash found in logcat!"
-              cat logcat.txt
-              exit 1
-            fi
+            adb shell pidof com.demeter.carbono > /dev/null || (echo "Error: App process is not running!" && cat logcat.txt && exit 1)
+            grep -q "FATAL EXCEPTION\|AndroidRuntime\|SIGABRT\|SIGSEGV" logcat.txt && (echo "Error: Critical crash found in logcat!" && cat logcat.txt && exit 1) || true
             echo "Smoke test passed!"
 
       - name: Upload Logcat on Failure
