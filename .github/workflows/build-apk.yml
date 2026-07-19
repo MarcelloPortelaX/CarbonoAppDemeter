@@ -118,7 +118,6 @@ jobs:
           python-version: '3.12'
 
       - name: Send Email Notification
-        if: secrets.APK_EMAIL_SENDER != '' && secrets.APK_EMAIL_APP_PASSWORD != ''
         env:
           APK_EMAIL_SENDER: ${{ secrets.APK_EMAIL_SENDER }}
           APK_EMAIL_APP_PASSWORD: ${{ secrets.APK_EMAIL_APP_PASSWORD }}
@@ -127,11 +126,9 @@ jobs:
           API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           APK_PATH: apps/mobile/dist/demeter-carbono.apk
           RELEASE_URL: ${{ steps.create_release.outputs.url }}
-        run: python scripts/send-apk-email.py
-
-      - name: Email Missing Notice
-        if: secrets.APK_EMAIL_SENDER == '' || secrets.APK_EMAIL_APP_PASSWORD == ''
-        env:
-          APK_EMAIL_SENDER: ${{ secrets.APK_EMAIL_SENDER }}
-          APK_EMAIL_APP_PASSWORD: ${{ secrets.APK_EMAIL_APP_PASSWORD }}
-        run: echo "Email notification was skipped because email secrets are missing."
+        run: |
+          if [ -n "$APK_EMAIL_SENDER" ] && [ -n "$APK_EMAIL_APP_PASSWORD" ]; then
+            python scripts/send-apk-email.py
+          else
+            echo "Email notification was skipped because email secrets are missing."
+          fi
