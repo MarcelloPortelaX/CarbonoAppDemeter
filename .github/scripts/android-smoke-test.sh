@@ -68,8 +68,26 @@ if grep -Eq "ReactNativeJS.*(TypeError|ReferenceError|Invariant Violation|Unhand
 fi
 
 echo "Dumping UI layout to confirm home screen..."
-adb shell uiautomator dump /sdcard/window.xml
-adb pull /sdcard/window.xml window.xml
+for i in {1..4}; do
+  adb shell uiautomator dump /sdcard/window.xml
+  adb pull /sdcard/window.xml window.xml
+  
+  if grep -q "isn't responding" window.xml; then
+    echo "Detected 'isn't responding' ANR dialog. Dismissing by pressing Wait/Back..."
+    # Press TAB to navigate buttons or BACK to dismiss
+    adb shell input keyevent 4
+    sleep 3
+    continue
+  fi
+
+  if grep -Eq "Minhas áreas|DEMETER CARBONO|Nova área" window.xml; then
+    echo "Expected home UI found!"
+    break
+  fi
+
+  echo "UI not ready yet, waiting 5 seconds..."
+  sleep 5
+done
 
 echo "Checking UI layout for expected text..."
 if ! grep -Eq "Minhas áreas|DEMETER CARBONO|Nova área" window.xml; then
