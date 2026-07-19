@@ -1,27 +1,32 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.application.memory_repository import repository
+from app.api.deps import get_repository
+from app.application.postgres_repository import PostgresRepository
 from app.domain.schemas import PropertyCreate, PropertyRead
 
 router = APIRouter()
 
 
 @router.post("", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
-def create_property(payload: PropertyCreate) -> PropertyRead:
+async def create_property(
+    payload: PropertyCreate, repo: PostgresRepository = Depends(get_repository)
+) -> PropertyRead:
     item = PropertyRead(**payload.model_dump())
-    return repository.save_property(item)
+    return await repo.save_property(item)
 
 
 @router.get("", response_model=list[PropertyRead])
-def list_properties() -> list[PropertyRead]:
-    return repository.list_properties()
+async def list_properties(repo: PostgresRepository = Depends(get_repository)) -> list[PropertyRead]:
+    return await repo.list_properties()
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
-def get_property(property_id: UUID) -> PropertyRead:
-    item = repository.get_property(property_id)
+async def get_property(
+    property_id: UUID, repo: PostgresRepository = Depends(get_repository)
+) -> PropertyRead:
+    item = await repo.get_property(property_id)
     if item is None:
         raise HTTPException(status_code=404, detail="property not found")
     return item

@@ -31,3 +31,6 @@ select = ["E", "F", "I", "B", "UP"]
 pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.setuptools]
+packages = ["app"]

@@ -9,8 +9,9 @@ from app.core.config import settings
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Database lifecycle will be enabled after the first migration is applied.
+    from app.persistence.database import engine
     yield
+    await engine.dispose()
 
 
 app = FastAPI(
