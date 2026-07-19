@@ -2,12 +2,18 @@ import { z } from 'zod';
 import { usePropertyStore } from '../state/propertyStore';
 import { createProperty, updateBoundary, confirmBoundary, submitAssessment, ApiError } from './api';
 
+let isProcessing = false;
+
 export async function processOutbox() {
-  const state = usePropertyStore.getState();
-  const outbox = [...state.outbox];
-  const properties = state.properties;
+  if (isProcessing) return;
+  isProcessing = true;
   
-  if (outbox.length === 0) return;
+  try {
+    const state = usePropertyStore.getState();
+    const outbox = [...state.outbox];
+    const properties = state.properties;
+    
+    if (outbox.length === 0) return;
 
   // Group by propertyId to process sequentially per property
   const opsByProperty = outbox.reduce((acc, op) => {
@@ -121,5 +127,7 @@ export async function processOutbox() {
         }
       }
     }
+  } finally {
+    isProcessing = false;
   }
 }

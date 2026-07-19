@@ -247,23 +247,44 @@ export const usePropertyStore = create<PropertyState>()(
         outbox: state.outbox,
       }),
       migrate: (persistedState: unknown, version: number) => {
-        const state = persistedState as PropertyState;
-        if (version < 3) {
-          // Convert syncStatus to remoteStatus
-          state.properties = state.properties?.map((p: PropertySummary & { syncStatus?: string }) => {
-            const remoteStatus = p.syncStatus === 'synced' ? 'created' : (p.syncStatus === 'error' ? 'error' : 'local');
-            delete p.syncStatus;
-            return { ...p, remoteStatus } as PropertySummary;
-          });
-          // For operations, mark unknown ones as failed, though they should be compatible
-          state.outbox = state.outbox?.map((op: SyncOperation & { status?: string }) => ({
-            ...op,
-            status: op.status === 'failed' ? 'failed' : op.status || 'pending'
-          })) as SyncOperation[];
+        try {
+          if (!persistedState || typeof persistedState !== 'object') {
+            return { properties: [], passports: {}, outbox: [] };
+          }
+          
+          let state = persistedState as any;
+          
+          if (version < 3) {
+            // Convert syncStatus to remoteStatus
+            state.properties = (state.properties || []).map((p: any) => {
+              const remoteStatus = p.syncStatus === 'synced' ? 'created' : (p.syncStatus === 'error' ? 'error' : 'local');
+              delete p.syncStatus;
+              return { ...p, remoteStatus };
+            });
+            // For operations, mark unknown ones as failed, though they should be compatible
+            state.outbox = (state.outbox || []).map((op: any) => ({
+              ...op,
+              status: op.status === 'failed' ? 'failed' : op.status || 'pending'
+            }));
+          }
+          
+          // Ensure arrays/objects exist
+          state.properties = Array.isArray(state.properties) ? state.properties : [];
+          state.passports = state.passports && typeof state.passports === 'object' ? state.passports : {};
+          state.outbox = Array.isArray(state.outbox) ? state.outbox : [];
+          
+          return state as PropertyState;
+        } catch (e) {
+          console.warn('Failed to migrate state, resetting to default', e);
+          return { properties: [], passports: {}, outbox: [] } as PropertyState;
         }
-        return state;
       },
-      onRehydrateStorage: () => (state) => state?.setHydrated(true),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('Failed to hydrate state', error);
+        }
+        usePropertyStore.setState({ hydrated: true });
+      },
     },
   ),
 );
