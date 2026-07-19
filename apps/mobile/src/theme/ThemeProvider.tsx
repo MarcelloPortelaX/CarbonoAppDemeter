@@ -30,10 +30,10 @@ export function DemeterThemeProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    SystemUI.setBackgroundColorAsync(theme.colors.background).catch(() => undefined);
-    NavigationBar.setStyle(resolved === 'dark' ? 'dark' : 'light');
-    if (mode !== 'system') Appearance.setColorScheme(mode);
-  }, [mode, resolved, theme.colors.background]);
+  // SystemUI.setBackgroundColorAsync(theme.colors.background).catch(() => undefined);
+  // NavigationBar.setStyle(resolved === 'dark' ? 'dark' : 'light');
+  // if (mode !== 'system') Appearance.setColorScheme(mode);
+}, [mode, resolved, theme.colors.background]);
 
   const setMode = useCallback(async (next: ThemeMode) => {
     setModeState(next);
