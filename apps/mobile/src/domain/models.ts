@@ -50,19 +50,36 @@ export const ApiAssessmentCreateSchema = z.object({
 });
 export type ApiAssessmentCreate = z.infer<typeof ApiAssessmentCreateSchema>;
 
+export const SourceReferenceSchema = z.object({
+  source_id: z.string(),
+  title: z.string(),
+  organization: z.string(),
+  url: z.string(),
+  version: z.string().nullable(),
+  accessed_at: z.string(),
+});
+
 export const CalculationProvenanceSchema = z.object({
   run_id: z.string().uuid(),
-  maturity: z.string(),
+  maturity: z.enum([
+    'screening',
+    'scenario',
+    'estimate',
+    'verified',
+    'issued',
+  ]),
   methodology_id: z.string(),
   methodology_version: z.string(),
   calculation_enabled: z.boolean(),
   input_hash: z.string(),
   code_version: z.string(),
-  units: z.string(),
-  uncertainty: z.number(),
-  sources: z.array(z.string()),
-  reviewer_id: z.string().nullable().optional(),
-  reviewed_at: z.string().nullable().optional(),
+  units: z.record(z.string(), z.string()),
+  uncertainty: z
+    .record(z.string(), z.union([z.number(), z.string()]))
+    .nullable(),
+  sources: z.array(SourceReferenceSchema),
+  reviewer_id: z.string().nullable(),
+  reviewed_at: z.string().nullable(),
   created_at: z.string(),
 });
 export type CalculationProvenance = z.infer<typeof CalculationProvenanceSchema>;

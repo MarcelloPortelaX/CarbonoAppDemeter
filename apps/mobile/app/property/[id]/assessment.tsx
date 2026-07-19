@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, Text, View, ScrollView, ActivityIndicator } from
 import { NeonButton } from '../../../src/components/NeonButton';
 import { Screen } from '../../../src/components/Screen';
 import { useDemeterTheme } from '../../../src/theme/ThemeProvider';
-import { submitAssessment } from '../../../src/services/api';
 import { usePropertyStore } from '../../../src/state/propertyStore';
 
 type ThemeType = ReturnType<typeof useDemeterTheme>['theme'];

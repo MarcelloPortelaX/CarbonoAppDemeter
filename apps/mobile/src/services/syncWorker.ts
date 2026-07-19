@@ -72,6 +72,20 @@ export async function processOutbox() {
             blockedByPrevious = true;
             continue;
           }
+        } else if (operation.kind === 'submit_assessment') {
+          if (property.remoteStatus === 'created') {
+            const pendingOps = ops.find(o => (o.kind === 'update_boundary' || o.kind === 'confirm_boundary') && o.status !== 'failed');
+            if (pendingOps) {
+               blockedByPrevious = true;
+               continue;
+            }
+            await submitAssessment(operation.propertyId, operation.payload);
+          } else if (property.remoteStatus === 'error') {
+            throw new ApiError('Property creation failed previously', 422);
+          } else {
+            blockedByPrevious = true;
+            continue;
+          }
         }
         
         // Operation succeeded

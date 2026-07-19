@@ -10,57 +10,124 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate Secrets
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Error: EXPO_TOKEN is required."
+            exit 1
+          fi
+          if [ -z "${{ secrets.APK_EMAIL_SENDER }}" ] || [ -z "${{ secrets.APK_EMAIL_APP_PASSWORD }}" ]; then
+            echo "Warning: Email secrets missing. APK will be built but email will not be sent."
+          fi
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
+
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      - name: Install dependencies
+
+      - name: Install dependencies & Typecheck
         working-directory: ./apps/mobile
-        run: npm ci
-      - name: Build APK locally
+        run: |
+          npm ci
+          npm run typecheck
+
+      - name: Build APK via EAS
+        id: eas-build
         working-directory: ./apps/mobile
         env:
           EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
-        run: eas build -p android --profile preview --local --non-interactive --output dist/demeter-carbono.apk
+        run: |
+          mkdir -p dist
+          echo "Starting remote EAS build..."
+          eas build --platform android --profile preview --non-interactive --wait --json > build_result.json
+          
+          ARTIFACT_URL=$(jq -r '.[0].artifacts.buildUrl' build_result.json)
+          if [ "$ARTIFACT_URL" = "null" ] || [ -z "$ARTIFACT_URL" ]; then
+            echo "Error: Could not retrieve artifact URL from EAS."
+            cat build_result.json
+            exit 1
+          fi
+          
+          echo "Downloading APK from $ARTIFACT_URL..."
+          curl -L -o dist/demeter-carbono.apk "$ARTIFACT_URL"
+          
+          FILE_SIZE=$(stat -c%s "dist/demeter-carbono.apk")
+          if [ "$FILE_SIZE" -lt 1000000 ]; then
+            echo "Error: Downloaded file is too small to be a valid APK."
+            exit 1
+          fi
+          
+          FILE_TYPE=$(file -b dist/demeter-carbono.apk)
+          if echo "$FILE_TYPE" | grep -q "HTML"; then
+            echo "Error: Downloaded file is HTML."
+            exit 1
+          fi
+          
+          echo "APK validated successfully."
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: demeter-carbono-apk
           path: apps/mobile/dist/demeter-carbono.apk
+
+      - name: Determine Tag
+        id: vars
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${github.ref#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            SHORT_SHA=$(echo "${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
+            TIMESTAMP=$(date +'%Y%m%d-%H%M')
+            echo "tag=apk-${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Release ${{ steps.vars.outputs.tag }}
           files: apps/mobile/dist/demeter-carbono.apk
-          name: Release ${{ github.ref_name }}
           draft: false
           generate_release_notes: true
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Send Email Notification
+        if: ${{ secrets.APK_EMAIL_SENDER != '' && secrets.APK_EMAIL_APP_PASSWORD != '' }}
         env:
           APK_EMAIL_SENDER: ${{ secrets.APK_EMAIL_SENDER }}
           APK_EMAIL_APP_PASSWORD: ${{ secrets.APK_EMAIL_APP_PASSWORD }}
-          GITHUB_SHA: ${{ github.sha }}
-          APP_VERSION: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          APP_VERSION: ${{ steps.vars.outputs.tag }}
           API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           APK_PATH: apps/mobile/dist/demeter-carbono.apk
+          RELEASE_URL: ${{ steps.create_release.outputs.url }}
         run: python scripts/send-apk-email.py
+
+      - name: Email Missing Notice
+        if: ${{ secrets.APK_EMAIL_SENDER == '' || secrets.APK_EMAIL_APP_PASSWORD == '' }}
+        run: echo "Email notification was skipped because email secrets are missing."

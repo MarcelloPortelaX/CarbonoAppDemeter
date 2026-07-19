@@ -56,6 +56,7 @@ export default function Passport() {
     }
   }, [id, property?.remoteStatus]);
 
+  const pendingAssessment = usePropertyStore((state) => state.outbox.find(o => o.kind === 'submit_assessment' && o.propertyId === id));
   const passport = remotePassport || localPassport;
 
   const sharePassport = async () => {
@@ -70,6 +71,20 @@ export default function Passport() {
   };
 
   if (!property || !passport) {
+    if (pendingAssessment) {
+      return (
+        <Screen style={styles.missing}>
+          <EmptyState
+            icon="cloud-sync"
+            title="Sincronização pendente"
+            message="Triagem salva no dispositivo. O passaporte será atualizado após a sincronização."
+            actionLabel="Voltar às áreas"
+            onAction={() => router.replace('/areas')}
+          />
+        </Screen>
+      );
+    }
+
     return (
       <Screen style={styles.missing}>
         <EmptyState

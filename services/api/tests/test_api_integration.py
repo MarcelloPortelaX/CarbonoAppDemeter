@@ -1,8 +1,12 @@
 import os
-import socket
 from uuid import uuid4
 
 import pytest
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.asyncio,
+]
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -154,7 +158,7 @@ async def test_confirm_boundary():
         # Valid confirmation
         res_conf = await ac.post(f"/api/v1/properties/{property_id}/boundaries/{b_id1}/confirm")
         assert res_conf.status_code == 200
-        assert res_conf.json()["is_confirmed"] == True
+        assert res_conf.json()["is_confirmed"]
 
         # Repeat confirmation (idempotent)
         res_conf2 = await ac.post(f"/api/v1/properties/{property_id}/boundaries/{b_id1}/confirm")
@@ -167,8 +171,8 @@ async def test_confirm_boundary():
         async with engine.begin() as conn:
             row1 = (await conn.execute(text("SELECT is_confirmed FROM boundary_versions WHERE id = :id"), {"id": b_id1})).fetchone()
             row2 = (await conn.execute(text("SELECT is_confirmed FROM boundary_versions WHERE id = :id"), {"id": b_id2})).fetchone()
-            assert row1[0] == False
-            assert row2[0] == True
+            assert not row1[0]
+            assert row2[0]
 
 @pytest.mark.asyncio
 async def test_assessment_idempotency():
@@ -178,24 +182,41 @@ async def test_assessment_idempotency():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await ac.post("/api/v1/properties", json=prop_payload)
         
-        ass_id = str(uuid4())
         ass_payload = {
-            "id": ass_id,
-            "property_id": property_id,
-            "answers": {"q1": "yes"}
+            "has_possession_proof": True,
+            "intends_restoration": True,
+            "recent_clearing": False
         }
         
-        res1 = await ac.post(f"/api/v1/assessments/{property_id}", json=ass_payload)
+        # Test 404 on nonexistent property
+        fake_id = str(uuid4())
+        res_404 = await ac.post(f"/api/v1/assessments/properties/{fake_id}", json=ass_payload)
+        assert res_404.status_code == 404
+        
+        # Test 422 on invalid payload
+        res_422 = await ac.post(f"/api/v1/assessments/properties/{property_id}", json={"has_possession_proof": "not_boolean"})
+        assert res_422.status_code == 422
+        
+        # Test Passport before assessment -> 409
+        res_pass_before = await ac.get(f"/api/v1/passports/{property_id}")
+        assert res_pass_before.status_code == 409
+
+        # Test successful submission
+        res1 = await ac.post(f"/api/v1/assessments/properties/{property_id}", json=ass_payload)
         assert res1.status_code in [200, 201]
         data1 = res1.json()
         
         # Exact same input should return the exact same persisted object
-        res2 = await ac.post(f"/api/v1/assessments/{property_id}", json=ass_payload)
+        res2 = await ac.post(f"/api/v1/assessments/properties/{property_id}", json=ass_payload)
         assert res2.status_code in [200, 201]
         data2 = res2.json()
         
         assert data1["id"] == data2["id"]
         assert data1["created_at"] == data2["created_at"]
+        
+        # Test Passport after assessment -> 200
+        res_pass_after = await ac.get(f"/api/v1/passports/{property_id}")
+        assert res_pass_after.status_code == 200
         
         async with engine.begin() as conn:
             row = (await conn.execute(text("SELECT count(*) FROM assessments WHERE property_id = :id"), {"id": property_id})).scalar()

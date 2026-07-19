@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +30,9 @@ class PostgresRepository:
         
         if existing:
             if existing.name == creation_request.name and existing.municipality == creation_request.municipality and existing.land_use == land_use_val:
-                return await self.get_property(creation_request.id) # type: ignore
+                prop = await self.get_property(creation_request.id)
+                assert prop is not None
+                return prop
             raise HTTPException(status_code=409, detail="Property with same ID but different canonical content already exists")
 
         stmt = insert(PropertyModel).values(
@@ -43,7 +45,9 @@ class PostgresRepository:
         await self.session.execute(stmt)
         await self.session.commit()
         
-        return await self.get_property(creation_request.id) # type: ignore
+        prop = await self.get_property(creation_request.id)
+        assert prop is not None
+        return prop
 
     async def get_property(self, property_id: UUID) -> PropertyRead | None:
         result = await self.session.execute(select(PropertyModel).filter_by(id=property_id))
@@ -74,8 +78,7 @@ class PostgresRepository:
         ]
 
     async def save_boundary(self, property_id: UUID, boundary_request: BoundaryCreate) -> BoundaryVersionRead:
-        from shapely.geometry import MultiPolygon, Polygon  # type: ignore
-        from shapely.validation import make_valid  # type: ignore
+        from shapely.geometry import MultiPolygon, Polygon  # type: ignore 
         
         if not boundary_request.boundary_id:
             raise HTTPException(status_code=422, detail="boundary_id is required for idempotency")
@@ -102,7 +105,7 @@ class PostgresRepository:
             raise HTTPException(status_code=422, detail="polygon has zero area")
 
         # Normalize orientation (exterior ring counter-clockwise)
-        from shapely.geometry.polygon import orient  # type: ignore
+        from shapely.geometry.polygon import orient  # type: ignore 
         poly = orient(poly, sign=1.0)
         
         # Normalize start point of the ring to ensure deterministic WKT
@@ -172,7 +175,10 @@ class PostgresRepository:
             "ewkt": ewkt,
             "input_hash": input_hash
         })
-        created_at = result.scalar()
+        created_at_dt = result.scalar()
+        import datetime
+        from typing import cast
+        created_at_val = cast(datetime.datetime, created_at_dt)
         
         update_stmt = text("""
             UPDATE boundary_versions 
@@ -196,7 +202,7 @@ class PostgresRepository:
             area_ha=new_area,
             perimeter_km=new_perimeter,
             input_hash=input_hash,
-            created_at=created_at  # type: ignore
+            created_at=created_at_val 
         )
 
     async def confirm_boundary(self, property_id: UUID, boundary_id: UUID) -> BoundaryConfirmationRead:

@@ -33,6 +33,9 @@ ignore = ["B008", "B904", "E501"]
 pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+  "integration: tests requiring PostgreSQL/PostGIS",
+]
 
 [tool.setuptools]
 packages = ["app"]
