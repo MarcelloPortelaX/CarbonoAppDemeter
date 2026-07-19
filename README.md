@@ -4,9 +4,9 @@ Aplicativo mobile para organização e triagem de propriedades candidatas a proj
 
 ## Sobre o projeto
 
-O Demeter Carbono é uma ferramenta de triagem preliminar — não de certificação. Ele organiza propriedades rurais, documenta características de uso do solo e gera um **Passaporte de Carbono** com indicadores de elegibilidade para futuras análises técnicas.
+O Demeter Carbono é uma ferramenta de triagem preliminar, não de certificação. Ele organiza propriedades rurais, documenta características de uso do solo e gera um **Passaporte de Carbono** com indicadores de elegibilidade para futuras análises técnicas.
 
-> Nenhum valor exibido no app representa crédito de carbono emitido, certificado ou disponível para negociação.
+Nenhum valor exibido no app representa crédito de carbono emitido, certificado ou disponível para negociação.
 
 ## O que o app faz
 
