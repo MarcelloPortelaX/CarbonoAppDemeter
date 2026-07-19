@@ -47,14 +47,7 @@ SHA-256: {sha256_hash}
     if apk_file.exists():
         size_mb = apk_file.stat().st_size / (1024 * 1024)
         body += f"Tamanho: {size_mb:.1f} MB\n\n"
-        if size_mb <= 24:
-            if not dry_run:
-                with open(apk_file, 'rb') as f:
-                    apk_data = f.read()
-                msg.add_attachment(apk_data, maintype='application', subtype='vnd.android.package-archive', filename=apk_file.name)
-            body += f"O APK está anexado a este e-mail."
-        else:
-            body += f"O APK excede o limite de anexo do Gmail. Baixe-o diretamente pelo link da Release acima."
+        body += f"O APK não está anexado neste e-mail. Por favor, baixe-o diretamente pelo link da Release no GitHub acima."
     else:
         body += "Aviso: Arquivo APK não encontrado no momento da construção do e-mail. Utilize o link da Release."
 
