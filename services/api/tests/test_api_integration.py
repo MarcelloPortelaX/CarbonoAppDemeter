@@ -14,6 +14,8 @@ pytestmark = [
     pytest.mark.asyncio,
 ]
 
+
+
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
 if not TEST_DATABASE_URL:
@@ -22,7 +24,9 @@ if not TEST_DATABASE_URL:
         allow_module_level=True,
     )
 
-engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+from sqlalchemy.pool import NullPool
+
+engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 TestingSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 async def override_get_db():
