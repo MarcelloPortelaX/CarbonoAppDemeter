@@ -26,9 +26,6 @@ jobs:
 
       - name: Validate Secrets
         run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "Error: EXPO_TOKEN is missing or empty!"
-          fi
           if [ -z "${{ secrets.APK_EMAIL_SENDER }}" ] || [ -z "${{ secrets.APK_EMAIL_APP_PASSWORD }}" ]; then
             echo "Warning: Email secrets missing. APK will be built but email will not be sent."
           fi
@@ -38,50 +35,34 @@ jobs:
         with:
           node-version: 22.13.0
 
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
+      - name: Setup Java
+        uses: actions/setup-java@v3
         with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Install dependencies & Typecheck
-        working-directory: ./apps/mobile
+        working-directory: apps/mobile
         run: |
           npm ci
-          npm run typecheck
+          npx tsc --noEmit
 
-      - name: Build APK via EAS
-        id: eas-build
-        working-directory: ./apps/mobile
-        env:
-          EXPO_PUBLIC_API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
+      - name: Build APK locally (prebuild + gradlew)
+        working-directory: apps/mobile
         run: |
           mkdir -p dist
-          echo "Starting remote EAS build..."
-          eas build --platform android --profile preview --non-interactive --wait --json > build_result.json
-          
-          ARTIFACT_URL=$(jq -r '.[0].artifacts.buildUrl' build_result.json)
-          if [ "$ARTIFACT_URL" = "null" ] || [ -z "$ARTIFACT_URL" ]; then
-            echo "Error: Could not retrieve artifact URL from EAS."
-            cat build_result.json
-            exit 1
-          fi
-          
-          echo "Downloading APK from $ARTIFACT_URL..."
-          curl -L -o dist/demeter-carbono.apk "$ARTIFACT_URL"
+          echo "Starting local Android build..."
+          npx expo prebuild --platform android --clean
+          cd android
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../dist/demeter-carbono.apk
+          cd ..
           
           FILE_SIZE=$(stat -c%s "dist/demeter-carbono.apk")
           if [ "$FILE_SIZE" -lt 1000000 ]; then
             echo "Error: Downloaded file is too small to be a valid APK."
             exit 1
           fi
-          
-          FILE_TYPE=$(file -b dist/demeter-carbono.apk)
-          if echo "$FILE_TYPE" | grep -q "HTML"; then
-            echo "Error: Downloaded file is HTML."
-            exit 1
-          fi
-          
           echo "APK validated successfully."
 
       - name: Android Smoke Test
