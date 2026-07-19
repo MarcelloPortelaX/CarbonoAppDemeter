@@ -3,7 +3,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
 import { StatusBar } from 'expo-status-bar';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Appearance, useColorScheme } from 'react-native';
+import { Appearance, Platform, useColorScheme } from 'react-native';
 import { AppTheme, ResolvedTheme, ThemeMode, themeFor } from './tokens';
 
 const STORAGE_KEY = 'demeter.theme.mode.v1';
@@ -30,10 +30,30 @@ export function DemeterThemeProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-  // SystemUI.setBackgroundColorAsync(theme.colors.background).catch(() => undefined);
-  // NavigationBar.setStyle(resolved === 'dark' ? 'dark' : 'light');
-  // if (mode !== 'system') Appearance.setColorScheme(mode);
-}, [mode, resolved, theme.colors.background]);
+    try {
+      SystemUI.setBackgroundColorAsync(theme.colors.background).catch((err) => {
+        console.warn('SystemUI background failed:', err);
+      });
+    } catch (err) {
+      console.warn('SystemUI sync failed:', err);
+    }
+
+    if (Platform.OS === 'android') {
+      try {
+        NavigationBar.setStyleAsync(resolved === 'dark' ? 'dark' : 'light').catch((err) => {
+          console.warn('NavigationBar style failed:', err);
+        });
+      } catch (err) {
+        console.warn('NavigationBar sync failed:', err);
+      }
+    }
+
+    try {
+      if (mode !== 'system') Appearance.setColorScheme(mode);
+    } catch (err) {
+      console.warn('Appearance set failed:', err);
+    }
+  }, [mode, resolved, theme.colors.background]);
 
   const setMode = useCallback(async (next: ThemeMode) => {
     setModeState(next);
