@@ -5,6 +5,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.api.deps import get_db
 from app.main import app
@@ -14,8 +15,6 @@ pytestmark = [
     pytest.mark.asyncio,
 ]
 
-
-
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
 if not TEST_DATABASE_URL:
@@ -23,8 +22,6 @@ if not TEST_DATABASE_URL:
         "TEST_DATABASE_URL is required for integration tests",
         allow_module_level=True,
     )
-
-from sqlalchemy.pool import NullPool
 
 engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 TestingSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
