@@ -29,6 +29,9 @@ if [ "$BOOT_COMPLETED" != "1" ]; then
   exit 1
 fi
 
+echo "Suppressing ANR and crash dialogs..."
+adb shell settings put global hide_error_dialogs 1 || true
+
 echo "Installing APK..."
 adb install -r "$APK"
 
