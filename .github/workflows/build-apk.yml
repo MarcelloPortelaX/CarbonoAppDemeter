@@ -1,34 +1,34 @@
 name: Build APK
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: ["main"]
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
+    inputs:
+      publish:
+        description: "Criar GitHub Release após os testes"
+        required: true
+        type: boolean
+        default: false
+      send_email:
+        description: "Enviar e-mail após publicação bem-sucedida"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
-  build-apk:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+  build_apk:
     runs-on: ubuntu-latest
-    environment: production
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-
-      - name: Validate Secrets
-        run: |
-          if [ -z "${{ secrets.APK_EMAIL_SENDER }}" ] || [ -z "${{ secrets.APK_EMAIL_APP_PASSWORD }}" ]; then
-            echo "Warning: Email secrets missing. APK will be built but email will not be sent."
-          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -41,75 +41,131 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install dependencies & Typecheck
+      - name: Install dependencies & Validate
         working-directory: apps/mobile
         run: |
           npm ci
-          npx tsc --noEmit
+          npm run typecheck
+          npm run lint
+          npm run test -- --runInBand
+          npx expo-doctor
+          npx expo install --check
+          npx expo export --platform android --clear
 
       - name: Build APK locally (prebuild + gradlew)
         working-directory: apps/mobile
         run: |
           mkdir -p dist
-          echo "Starting local Android build..."
+          export CI=1
           npx expo prebuild --platform android --clean
           cd android
-          ./gradlew assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk ../dist/demeter-carbono.apk
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon
+          APK_PATH=$(find app/build/outputs/apk -type f -name "*.apk" -print | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: APK not found after gradle build."
+            exit 1
+          fi
+          cp "$APK_PATH" ../dist/demeter-carbono.apk
           cd ..
+
+      - name: Setup Android SDK Build-Tools
+        uses: android-actions/setup-android@v3
+
+      - name: Validate APK
+        working-directory: apps/mobile
+        run: |
+          APK="dist/demeter-carbono.apk"
+          test -f "$APK" || (echo "Error: APK missing" && exit 1)
           
-          FILE_SIZE=$(stat -c%s "dist/demeter-carbono.apk")
+          FILE_SIZE=$(stat -c%s "$APK")
           if [ "$FILE_SIZE" -lt 1000000 ]; then
             echo "Error: Downloaded file is too small to be a valid APK."
             exit 1
           fi
-          echo "APK validated successfully."
+          
+          file "$APK" | grep -i "zip archive" || (echo "Error: Not a valid ZIP file" && exit 1)
+          unzip -t "$APK" > /dev/null || (echo "Error: ZIP integrity check failed" && exit 1)
+          
+          apksigner verify --print-certs "$APK" || (echo "Error: APK signature verification failed" && exit 1)
+          
+          aapt dump badging "$APK" > dist/apk-metadata.txt
+          grep -q "package: name='com.demeter.carbono'" dist/apk-metadata.txt || (echo "Error: Incorrect package name" && exit 1)
+          grep -q "launchable-activity" dist/apk-metadata.txt || (echo "Error: No launchable activity found" && exit 1)
+          
+          sha256sum "$APK" > dist/demeter-carbono.apk.sha256
+          echo "APK validated successfully"
+
+      - name: Upload Artifact Candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: demeter-carbono-apk-candidate
+          path: |
+            apps/mobile/dist/demeter-carbono.apk
+            apps/mobile/dist/demeter-carbono.apk.sha256
+            apps/mobile/dist/apk-metadata.txt
+
+  android_smoke_test:
+    needs: build_apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Artifact Candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: demeter-carbono-apk-candidate
+          path: apps/mobile/dist
 
       - name: Android Smoke Test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: 31
           target: default
-          arch: x86
-          profile: Nexus 6
+          arch: x86_64
+          profile: pixel_6
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
-            echo "Installing APK..."
-            adb install -r apps/mobile/dist/demeter-carbono.apk
-            echo "Starting App..."
-            adb shell monkey -p com.demeter.carbono -c android.intent.category.LAUNCHER 1
-            echo "Waiting for app to launch..."
-            sleep 15
-            echo "Checking process..."
-            adb logcat -d > logcat.txt
-            adb shell pidof com.demeter.carbono > /dev/null || (echo "Error: App process is not running!" && cat logcat.txt && exit 1)
-            grep -q "FATAL EXCEPTION\|AndroidRuntime\|SIGABRT\|SIGSEGV" logcat.txt && (echo "Error: Critical crash found in logcat!" && cat logcat.txt && exit 1) || true
-            echo "Smoke test passed!"
+            bash .github/scripts/android-smoke-test.sh
 
-      - name: Upload Logcat on Failure
-        if: failure()
+      - name: Upload Diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logcat-failure
-          path: logcat.txt
+          name: android-smoke-test-diagnostics
+          path: |
+            logcat.txt
+            window.xml
+            apps/mobile/dist/apk-metadata.txt
+            apps/mobile/dist/demeter-carbono.apk.sha256
+          if-no-files-found: ignore
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+  publish:
+    needs: [build_apk, android_smoke_test]
+    if: inputs.publish == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Verified Artifact
+        uses: actions/download-artifact@v4
         with:
-          name: demeter-carbono-apk
-          path: apps/mobile/dist/demeter-carbono.apk
+          name: demeter-carbono-apk-candidate
+          path: apps/mobile/dist
 
       - name: Determine Tag
         id: vars
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "tag=${github.ref#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            SHORT_SHA=$(echo "${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
-            TIMESTAMP=$(date +'%Y%m%d-%H%M')
-            echo "tag=apk-${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
-          fi
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TIMESTAMP=$(date +'%Y%m%d-%H%M')
+          echo "tag=apk-${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
@@ -117,28 +173,33 @@ jobs:
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: Release ${{ steps.vars.outputs.tag }}
-          target_commitish: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-          files: apps/mobile/dist/demeter-carbono.apk
+          target_commitish: ${{ github.sha }}
+          files: |
+            apps/mobile/dist/demeter-carbono.apk
+            apps/mobile/dist/demeter-carbono.apk.sha256
+            apps/mobile/dist/apk-metadata.txt
           draft: false
           generate_release_notes: true
 
       - name: Setup Python
+        if: inputs.send_email == true
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Send Email Notification
+        if: inputs.send_email == true
         env:
           APK_EMAIL_SENDER: ${{ secrets.APK_EMAIL_SENDER }}
           APK_EMAIL_APP_PASSWORD: ${{ secrets.APK_EMAIL_APP_PASSWORD }}
-          GITHUB_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          APK_EMAIL_RECIPIENT: ${{ secrets.APK_EMAIL_RECIPIENT }}
+          GITHUB_SHA: ${{ github.sha }}
           APP_VERSION: ${{ steps.vars.outputs.tag }}
-          API_URL: ${{ secrets.EXPO_PUBLIC_API_URL }}
           APK_PATH: apps/mobile/dist/demeter-carbono.apk
-          RELEASE_URL: ${{ steps.create_release.outputs.url }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.vars.outputs.tag }}
         run: |
-          if [ -n "$APK_EMAIL_SENDER" ] && [ -n "$APK_EMAIL_APP_PASSWORD" ]; then
-            python scripts/send-apk-email.py
-          else
-            echo "Email notification was skipped because email secrets are missing."
+          if [ -z "$APK_EMAIL_SENDER" ] || [ -z "$APK_EMAIL_APP_PASSWORD" ] || [ -z "$APK_EMAIL_RECIPIENT" ]; then
+            echo "Error: Email requested, but APK_EMAIL_SENDER/APK_EMAIL_APP_PASSWORD/APK_EMAIL_RECIPIENT are missing."
+            exit 1
           fi
+          python scripts/send-apk-email.py
