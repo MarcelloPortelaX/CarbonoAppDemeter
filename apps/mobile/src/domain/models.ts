@@ -50,6 +50,23 @@ export const ApiAssessmentCreateSchema = z.object({
 });
 export type ApiAssessmentCreate = z.infer<typeof ApiAssessmentCreateSchema>;
 
+export const CalculationProvenanceSchema = z.object({
+  run_id: z.string().uuid(),
+  maturity: z.string(),
+  methodology_id: z.string(),
+  methodology_version: z.string(),
+  calculation_enabled: z.boolean(),
+  input_hash: z.string(),
+  code_version: z.string(),
+  units: z.string(),
+  uncertainty: z.number(),
+  sources: z.array(z.string()),
+  reviewer_id: z.string().nullable().optional(),
+  reviewed_at: z.string().nullable().optional(),
+  created_at: z.string(),
+});
+export type CalculationProvenance = z.infer<typeof CalculationProvenanceSchema>;
+
 export const ApiPassportReadSchema = z.object({
   id: z.string().uuid(),
   property_id: z.string().uuid(),
@@ -74,7 +91,7 @@ export const ApiPassportReadSchema = z.object({
     upper_tco2e: z.number().nullable(),
     horizon_years: z.number().nullable(),
     disclaimer: z.string(),
-    provenance: z.any().nullable(),
+    provenance: CalculationProvenanceSchema.nullable(),
   }),
   created_at: z.string(),
   updated_at: z.string(),
@@ -154,4 +171,15 @@ export type ConfirmBoundaryOperation = {
   lastError?: string;
 };
 
-export type SyncOperation = CreatePropertyOperation | UpdateBoundaryOperation | ConfirmBoundaryOperation;
+export type SubmitAssessmentOperation = {
+  id: string;
+  kind: 'submit_assessment';
+  propertyId: string;
+  payload: ApiAssessmentCreate;
+  status: 'pending' | 'retryable' | 'failed';
+  attempt: number;
+  createdAt: string;
+  lastError?: string;
+};
+
+export type SyncOperation = CreatePropertyOperation | UpdateBoundaryOperation | ConfirmBoundaryOperation | SubmitAssessmentOperation;

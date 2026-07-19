@@ -53,6 +53,7 @@ type PropertyState = {
   setBoundaryId: (propertyId: string, boundaryId: string) => void;
   incrementOperationAttempt: (operationId: string) => void;
   updateOperationStatus: (operationId: string, status: 'pending' | 'retryable' | 'failed', error?: string) => void;
+  submitAssessment: (propertyId: string, payload: import('../domain/models').ApiAssessmentCreate) => void;
 };
 
 export const usePropertyStore = create<PropertyState>()(
@@ -214,12 +215,27 @@ export const usePropertyStore = create<PropertyState>()(
             op.id === operationId ? { ...op, attempt: op.attempt + 1 } : op
           ),
         })),
-      updateOperationStatus: (operationId, status, error) =>
+      updateOperationStatus: (operationId, status, error) => {
         set((state) => ({
-          outbox: state.outbox.map((op) => 
+          outbox: state.outbox.map((op) =>
             op.id === operationId ? { ...op, status, lastError: error } : op
           ),
-        })),
+        }));
+      },
+      submitAssessment: (propertyId, payload) => {
+        const id = identifier();
+        set((state) => ({
+          outbox: queueOperation(state.outbox, {
+            id,
+            kind: 'submit_assessment',
+            propertyId,
+            payload,
+            status: 'pending',
+            attempt: 0,
+            createdAt: new Date().toISOString(),
+          }),
+        }));
+      },
     }),
     {
       name: 'demeter-carbono.mobile.v3', // Incremented version as requested

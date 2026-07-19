@@ -24,25 +24,25 @@ export default function AssessmentForm() {
 
   const isValid = hasPossessionProof !== null && intendsRestoration !== null && recentClearing !== null;
 
+  const submitAssessmentOp = usePropertyStore((state) => state.submitAssessment);
+
   const handleSubmit = async () => {
     if (!isValid || !property) return;
-    if (property.remoteStatus !== 'created') {
-      setError('Aguarde a sincronização da área com o servidor antes de enviar.');
-      return;
-    }
     setSubmitting(true);
     setError(null);
     try {
-      await submitAssessment(property.id, {
+      // Offline-first: enqueue operation
+      submitAssessmentOp(property.id, {
         has_possession_proof: hasPossessionProof,
         intends_restoration: intendsRestoration,
         recent_clearing: recentClearing,
       });
+      
       // Navegar para o passaporte em caso de sucesso
       router.replace({ pathname: '/passport/[id]', params: { id: property.id } });
     } catch (e) {
-      console.warn('Failed to submit assessment:', e);
-      setError('Falha ao enviar triagem. Verifique a conexão.');
+      console.warn('Failed to enqueue assessment:', e);
+      setError('Falha ao registrar triagem. Verifique se o aplicativo está atualizado.');
     } finally {
       setSubmitting(false);
     }

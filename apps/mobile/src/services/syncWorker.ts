@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { usePropertyStore } from '../state/propertyStore';
-import { createProperty, updateBoundary, confirmBoundary, ApiError } from './api';
+import { createProperty, updateBoundary, confirmBoundary, submitAssessment, ApiError } from './api';
 
 export async function processOutbox() {
   const state = usePropertyStore.getState();

@@ -10,19 +10,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.api.deps import get_db
 from app.main import app
 
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://demeter:demeter@localhost:5432/demeter_carbono_test")
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+
+if not TEST_DATABASE_URL:
+    pytest.skip(
+        "TEST_DATABASE_URL is required for integration tests",
+        allow_module_level=True,
+    )
 
 engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestingSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-def is_db_running():
-    try:
-        with socket.create_connection(("localhost", 5432), timeout=1):
-            return True
-    except OSError:
-        return False
-
-pytestmark = pytest.mark.skipif(not is_db_running(), reason="PostgreSQL not running locally")
 
 async def override_get_db():
     async with TestingSessionLocal() as session:
@@ -32,9 +29,11 @@ app.dependency_overrides[get_db] = override_get_db
 
 @pytest.fixture(autouse=True)
 async def clear_db():
+    if not TEST_DATABASE_URL.endswith("_test"):
+        raise RuntimeError("TEST_DATABASE_URL must end with '_test' to prevent wiping dev databases.")
     async with engine.begin() as conn:
         # Clear tables before each test to ensure isolation.
-        await conn.execute(text("TRUNCATE TABLE audit_events_v2, evidence, calculation_runs, boundary_versions, properties CASCADE;"))
+        await conn.execute(text("TRUNCATE TABLE audit_events_v2, evidence, calculation_runs, boundary_versions, assessments, properties CASCADE;"))
     yield
 
 @pytest.mark.asyncio
@@ -67,57 +66,137 @@ async def test_create_property_idempotent():
         assert len(list_response.json()) == 1
 
 @pytest.mark.asyncio
+
+@pytest.mark.asyncio
 async def test_create_boundary():
     property_id = str(uuid4())
-    payload = {
-        "id": property_id,
-        "name": "Integration Farm",
-        "municipality": "Test City",
-        "land_use": "agriculture"
-    }
+    payload = {"id": property_id, "name": "Integration Farm", "municipality": "Test City", "land_use": "agriculture"}
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await ac.post("/api/v1/properties", json=payload)
 
-        # 1. Submitting < 3 points should fail
-        bad_boundary = {
-            "points": [
-                {"latitude": 10.0, "longitude": 20.0},
-                {"latitude": 10.1, "longitude": 20.1}
-            ]
-        }
-        res_bad = await ac.post(f"/api/v1/properties/{property_id}/boundaries", json=bad_boundary)
-        assert res_bad.status_code == 422
+        # 1. Submitting without boundary_id should fail
+        res_no_id = await ac.post(f"/api/v1/properties/{property_id}/boundaries", json={"points": [{"latitude": 0.0, "longitude": 0.0}, {"latitude": 0.1, "longitude": 0.0}, {"latitude": 0.1, "longitude": 0.1}, {"latitude": 0.0, "longitude": 0.1}]})
+        assert res_no_id.status_code == 422
 
         # 2. Submitting valid boundary
+        b_id1 = str(uuid4())
         good_boundary = {
-            "points": [
-                {"latitude": 0.0, "longitude": 0.0},
-                {"latitude": 0.1, "longitude": 0.0},
-                {"latitude": 0.1, "longitude": 0.1},
-                {"latitude": 0.0, "longitude": 0.1}
-            ]
+            "boundary_id": b_id1,
+            "points": [{"latitude": 0.0, "longitude": 0.0}, {"latitude": 0.1, "longitude": 0.0}, {"latitude": 0.1, "longitude": 0.1}, {"latitude": 0.0, "longitude": 0.1}]
         }
         res_good = await ac.post(f"/api/v1/properties/{property_id}/boundaries", json=good_boundary)
         assert res_good.status_code == 200
         data_good = res_good.json()
         assert data_good["version"] == 1
-        assert data_good["property_id"] == property_id
+        assert data_good["area_ha"] > 0
+        assert data_good["perimeter_km"] > 0
 
-        # 3. Submitting the identical boundary again should return version 1 (idempotency by hash)
+        # Check DB for MULTIPOLYGON and SRID 4326
+        async with engine.begin() as conn:
+            row = (await conn.execute(text("SELECT ST_GeometryType(geometry), ST_SRID(geometry) FROM boundary_versions WHERE id = :id"), {"id": b_id1})).fetchone()
+            assert row[0] == 'ST_MultiPolygon'
+            assert row[1] == 4326
+
+        # 3. Submitting the identical boundary again should return version 1 (idempotency by boundary_id AND geometry)
         res_dup = await ac.post(f"/api/v1/properties/{property_id}/boundaries", json=good_boundary)
         assert res_dup.status_code == 200
         assert res_dup.json()["version"] == 1
 
-        # 4. Submitting a new boundary should increment version
+        # 4. Submitting same boundary_id but different geometry (409 Conflict)
+        conflict_boundary = {
+            "boundary_id": b_id1,
+            "points": [{"latitude": 1.0, "longitude": 1.0}, {"latitude": 1.1, "longitude": 1.0}, {"latitude": 1.1, "longitude": 1.1}, {"latitude": 1.0, "longitude": 1.1}]
+        }
+        res_conflict = await ac.post(f"/api/v1/properties/{property_id}/boundaries", json=conflict_boundary)
+        assert res_conflict.status_code == 409
+
+        # 5. Submitting a new boundary_id creates a new version
+        b_id2 = str(uuid4())
         new_boundary = {
-            "points": [
-                {"latitude": 1.0, "longitude": 1.0},
-                {"latitude": 1.1, "longitude": 1.0},
-                {"latitude": 1.1, "longitude": 1.1},
-                {"latitude": 1.0, "longitude": 1.1}
-            ]
+            "boundary_id": b_id2,
+            "points": [{"latitude": 1.0, "longitude": 1.0}, {"latitude": 1.1, "longitude": 1.0}, {"latitude": 1.1, "longitude": 1.1}, {"latitude": 1.0, "longitude": 1.1}]
         }
         res_new = await ac.post(f"/api/v1/properties/{property_id}/boundaries", json=new_boundary)
         assert res_new.status_code == 200
         assert res_new.json()["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_confirm_boundary():
+    property_id = str(uuid4())
+    prop_payload = {"id": property_id, "name": "Integration Farm", "municipality": "Test City", "land_use": "agriculture"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await ac.post("/api/v1/properties", json=prop_payload)
+        
+        b_id1 = str(uuid4())
+        await ac.post(f"/api/v1/properties/{property_id}/boundaries", json={
+            "boundary_id": b_id1,
+            "points": [{"latitude": 0.0, "longitude": 0.0}, {"latitude": 0.1, "longitude": 0.0}, {"latitude": 0.1, "longitude": 0.1}, {"latitude": 0.0, "longitude": 0.1}]
+        })
+        b_id2 = str(uuid4())
+        await ac.post(f"/api/v1/properties/{property_id}/boundaries", json={
+            "boundary_id": b_id2,
+            "points": [{"latitude": 1.0, "longitude": 1.0}, {"latitude": 1.1, "longitude": 1.0}, {"latitude": 1.1, "longitude": 1.1}, {"latitude": 1.0, "longitude": 1.1}]
+        })
+
+        # Nonexistent boundary
+        res_404 = await ac.post(f"/api/v1/properties/{property_id}/boundaries/{str(uuid4())}/confirm")
+        assert res_404.status_code == 404
+
+        # Boundary belonging to another property
+        other_prop_id = str(uuid4())
+        await ac.post("/api/v1/properties", json={"id": other_prop_id, "name": "Other", "municipality": "Other", "land_use": "agriculture"})
+        res_404_other = await ac.post(f"/api/v1/properties/{other_prop_id}/boundaries/{b_id1}/confirm")
+        assert res_404_other.status_code == 404
+
+        # Valid confirmation
+        res_conf = await ac.post(f"/api/v1/properties/{property_id}/boundaries/{b_id1}/confirm")
+        assert res_conf.status_code == 200
+        assert res_conf.json()["is_confirmed"] == True
+
+        # Repeat confirmation (idempotent)
+        res_conf2 = await ac.post(f"/api/v1/properties/{property_id}/boundaries/{b_id1}/confirm")
+        assert res_conf2.status_code == 200
+
+        # Confirm new version unconfirms previous
+        res_conf3 = await ac.post(f"/api/v1/properties/{property_id}/boundaries/{b_id2}/confirm")
+        assert res_conf3.status_code == 200
+        
+        async with engine.begin() as conn:
+            row1 = (await conn.execute(text("SELECT is_confirmed FROM boundary_versions WHERE id = :id"), {"id": b_id1})).fetchone()
+            row2 = (await conn.execute(text("SELECT is_confirmed FROM boundary_versions WHERE id = :id"), {"id": b_id2})).fetchone()
+            assert row1[0] == False
+            assert row2[0] == True
+
+@pytest.mark.asyncio
+async def test_assessment_idempotency():
+    property_id = str(uuid4())
+    prop_payload = {"id": property_id, "name": "Integration Farm", "municipality": "Test City", "land_use": "agriculture"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        await ac.post("/api/v1/properties", json=prop_payload)
+        
+        ass_id = str(uuid4())
+        ass_payload = {
+            "id": ass_id,
+            "property_id": property_id,
+            "answers": {"q1": "yes"}
+        }
+        
+        res1 = await ac.post(f"/api/v1/assessments/{property_id}", json=ass_payload)
+        assert res1.status_code in [200, 201]
+        data1 = res1.json()
+        
+        # Exact same input should return the exact same persisted object
+        res2 = await ac.post(f"/api/v1/assessments/{property_id}", json=ass_payload)
+        assert res2.status_code in [200, 201]
+        data2 = res2.json()
+        
+        assert data1["id"] == data2["id"]
+        assert data1["created_at"] == data2["created_at"]
+        
+        async with engine.begin() as conn:
+            row = (await conn.execute(text("SELECT count(*) FROM assessments WHERE property_id = :id"), {"id": property_id})).scalar()
+            assert row == 1

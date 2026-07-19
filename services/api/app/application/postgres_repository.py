@@ -89,23 +89,38 @@ class PostgresRepository:
             
         try:
             poly = Polygon(coords)
-            if not poly.is_valid:
-                poly = make_valid(poly)
-                
-            if poly.is_empty:
-                raise HTTPException(status_code=422, detail="geometry is empty after validation")
-                
-            if poly.geom_type == 'Polygon':
-                poly = MultiPolygon([poly])
-            elif poly.geom_type != 'MultiPolygon':
-                raise HTTPException(status_code=422, detail=f"invalid geometry type resulting: {poly.geom_type}")
-                
-            if poly.area == 0:
-                raise HTTPException(status_code=422, detail="polygon has zero area")
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"invalid geometry: {e}")
 
-        # WKT is normalized by Shapely (orientation, etc.)
+        if not poly.is_valid:
+            raise HTTPException(status_code=422, detail="geometry is invalid (e.g. self-intersecting)")
+            
+        if poly.is_empty:
+            raise HTTPException(status_code=422, detail="geometry is empty")
+            
+        if poly.area == 0:
+            raise HTTPException(status_code=422, detail="polygon has zero area")
+
+        # Normalize orientation (exterior ring counter-clockwise)
+        from shapely.geometry.polygon import orient  # type: ignore
+        poly = orient(poly, sign=1.0)
+        
+        # Normalize start point of the ring to ensure deterministic WKT
+        def normalize_ring(ring):
+            coords = list(ring.coords)[:-1] # remove duplicate end point
+            # Find the "smallest" coordinate to use as the start point
+            min_idx = min(range(len(coords)), key=lambda i: (coords[i][0], coords[i][1]))
+            normalized_coords = coords[min_idx:] + coords[:min_idx]
+            normalized_coords.append(normalized_coords[0]) # add end point back
+            return type(ring)(normalized_coords)
+            
+        poly = Polygon(normalize_ring(poly.exterior), [normalize_ring(interior) for interior in poly.interiors])
+
+        if poly.geom_type == 'Polygon':
+            poly = MultiPolygon([poly])
+        elif poly.geom_type != 'MultiPolygon':
+            raise HTTPException(status_code=422, detail=f"invalid geometry type resulting: {poly.geom_type}")
+            
         wkt_str = poly.wkt
         input_hash = canonical_hash({"wkt": wkt_str})
         
@@ -185,24 +200,28 @@ class PostgresRepository:
         )
 
     async def confirm_boundary(self, property_id: UUID, boundary_id: UUID) -> BoundaryConfirmationRead:
-        property_record = await self.get_property(property_id)
-        if not property_record:
+        from sqlalchemy import text
+        
+        # Check property exists
+        result = await self.session.execute(select(PropertyModel).filter_by(id=property_id))
+        if not result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="property not found")
             
-        boundary_record = await self.session.execute(
+        # Check boundary exists for this property
+        result = await self.session.execute(
             select(BoundaryVersionModel).filter_by(id=boundary_id, property_id=property_id)
         )
-        if not boundary_record.scalar_one_or_none():
+        if not result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="boundary not found for this property")
             
         # Unconfirm all others
-        await self.session.execute(
-            func.text("UPDATE boundary_versions SET is_confirmed = false WHERE property_id = :prop_id").bindparams(prop_id=property_id)
-        )
+        unconfirm_stmt = text("UPDATE boundary_versions SET is_confirmed = false WHERE property_id = :prop_id AND id != :id")
+        await self.session.execute(unconfirm_stmt, {"prop_id": property_id, "id": boundary_id})
+        
         # Confirm the specified one
-        await self.session.execute(
-            func.text("UPDATE boundary_versions SET is_confirmed = true WHERE id = :id").bindparams(id=boundary_id)
-        )
+        confirm_stmt = text("UPDATE boundary_versions SET is_confirmed = true WHERE id = :id")
+        await self.session.execute(confirm_stmt, {"id": boundary_id})
+        
         await self.session.commit()
         return BoundaryConfirmationRead(property_id=property_id, boundary_id=boundary_id, is_confirmed=True)
 
@@ -221,7 +240,24 @@ class PostgresRepository:
         stmt = stmt.on_conflict_do_nothing(index_elements=['input_hash'])
         await self.session.execute(stmt)
         await self.session.commit()
-        return item
+        
+        # Load the actual persisted record to ensure we return the existing ID and timestamp
+        result = await self.session.execute(
+            select(AssessmentModel).filter_by(input_hash=item.input_hash)
+        )
+        record = result.scalar_one()
+        from app.domain.schemas import EligibilityStatus
+        return AssessmentRead(
+            id=record.id,
+            property_id=record.property_id,
+            status=EligibilityStatus(record.status),
+            score=record.score,
+            reasons=record.reasons,
+            pending=record.pending,
+            ruleset_version=record.ruleset_version,
+            input_hash=record.input_hash,
+            created_at=record.created_at
+        )
 
     async def latest_assessment(self, property_id: UUID) -> AssessmentRead | None:
         from app.domain.schemas import EligibilityStatus

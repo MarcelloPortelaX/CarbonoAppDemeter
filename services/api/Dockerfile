@@ -8,9 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-RUN mkdir app && touch app/__init__.py && pip install --no-cache-dir .
-
 COPY app ./app
+RUN pip install --no-cache-dir .
 COPY alembic.ini ./
 COPY alembic ./alembic
 

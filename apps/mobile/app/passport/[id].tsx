@@ -26,27 +26,28 @@ export default function Passport() {
     if (id && property?.remoteStatus !== 'local') {
       getPassport(id)
         .then((data: ApiPassportRead) => {
-          const statusMap: Record<string, PassportModel['status']> = {
+          const statusMap: Record<ApiPassportRead['eligibility'], PassportModel['status']> = {
             'potential': 'eligible',
             'needs_review': 'review',
             'not_ready': 'analysis'
           };
           
-          const stageMap: Record<string, number> = {
-            'screening': 1,
-            'documentation': 2,
-            'review': 3,
-            'validation': 4
+          const stageMap: Record<ApiPassportRead['stage'], 0 | 1 | 2 | 3 | 4> = {
+            area: 0,
+            eligibility: 1,
+            documentation: 2,
+            analysis: 3,
+            emission: 4,
           };
 
           const mapped: PassportModel = {
             propertyId: data.property_id,
-            status: statusMap[data.eligibility] || 'analysis',
+            status: statusMap[data.eligibility],
             resultState: data.scenario.maturity === 'screening' ? 'blocked' : 'demo',
             demoPotentialTco2e: data.scenario.value_tco2e ?? undefined,
             horizonYears: data.scenario.horizon_years ?? undefined,
             pendingCount: data.pending.length,
-            currentStep: (stageMap[data.stage] || 0) as 0|1|2|3|4,
+            currentStep: stageMap[data.stage],
             disclaimer: data.scenario.disclaimer
           };
           setRemotePassport(mapped);
