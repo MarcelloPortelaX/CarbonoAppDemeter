@@ -1,11 +1,13 @@
 import os
+from uuid import uuid4
+
 import pytest
 from httpx import ASGITransport, AsyncClient
-from uuid import uuid4
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import text
-from app.main import app
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 from app.api.deps import get_db
+from app.main import app
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://demeter:demeter@localhost:5432/demeter_carbono")
 

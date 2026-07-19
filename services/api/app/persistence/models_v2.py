@@ -55,6 +55,7 @@ class BoundaryVersionModel(Base):
     area_ha: Mapped[float] = mapped_column(Float)
     perimeter_km: Mapped[float] = mapped_column(Float)
     input_hash: Mapped[str] = mapped_column(String(64), index=True)
+    is_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -113,4 +114,16 @@ class ScientificSourceModel(Base):
     source_type: Mapped[str] = mapped_column(String(60)) # e.g. methodology, law, IPCC_guideline
     url: Mapped[str | None] = mapped_column(String(255))
     enabled_for_credit_calculation: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class AssessmentModel(Base):
+    __tablename__ = "assessments"
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    property_id: Mapped[UUID] = mapped_column(ForeignKey("properties.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    score: Mapped[int] = mapped_column(Integer)
+    reasons: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    pending: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    ruleset_version: Mapped[str] = mapped_column(String(40))
+    input_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

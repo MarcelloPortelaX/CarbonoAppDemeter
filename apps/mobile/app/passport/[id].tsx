@@ -13,13 +13,14 @@ import { SurfaceCard } from '../../src/components/SurfaceCard';
 import { usePropertyStore } from '../../src/state/propertyStore';
 import { useDemeterTheme } from '../../src/theme/ThemeProvider';
 import { getPassport } from '../../src/services/api';
+import { Passport as PassportModel } from '../../src/domain/models';
 
 export default function Passport() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useDemeterTheme();
   const property = usePropertyStore((state) => state.properties.find((item) => item.id === id));
   const localPassport = usePropertyStore((state) => (id ? state.passports[id] : undefined));
-  const [remotePassport, setRemotePassport] = useState<Passport | null>(null);
+  const [remotePassport, setRemotePassport] = useState<PassportModel | null>(null);
 
   useEffect(() => {
     if (id && property?.syncStatus === 'synced') {

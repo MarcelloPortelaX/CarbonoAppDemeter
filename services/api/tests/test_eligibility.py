@@ -1,6 +1,7 @@
 from uuid import uuid4
+
 from app.domain.eligibility import RULESET_VERSION, assess
-from app.domain.schemas import EligibilityStatus, LandUse, AssessmentInput
+from app.domain.schemas import AssessmentInput, EligibilityStatus, LandUse
 
 
 def candidate(**overrides):

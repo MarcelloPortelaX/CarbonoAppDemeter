@@ -2,7 +2,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PropertyStatus } from '../domain/models';
 import { useDemeterTheme } from '../theme/ThemeProvider';
 
-const labels: Record<PropertyStatus, string> = { analysis: 'Em análise', documentation: 'Documentação', eligible: 'Elegível', review: 'Revisão' };
+const labels: Record<PropertyStatus, string> = {
+  draft: 'Rascunho',
+  analysis: 'Em análise',
+  documentation: 'Doc. pendente',
+  eligible: 'Elegível',
+  review: 'Revisão técnica',
+};
 
 export function StatusPill({ status }: { status: PropertyStatus }) {
   const { theme } = useDemeterTheme();

@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from app.domain.schemas import AssessmentRead, EligibilityStatus, LandUse, AssessmentInput
+from app.domain.schemas import AssessmentInput, AssessmentRead, EligibilityStatus, LandUse
 
 RULESET_VERSION = "demeter-triage-0.1.0"
 

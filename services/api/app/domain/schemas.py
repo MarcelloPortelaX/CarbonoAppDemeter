@@ -41,6 +41,7 @@ class PropertyRead(BaseModel):
 
 
 class BoundaryCreate(BaseModel):
+    boundary_id: UUID | None = None
     points: list[Position] = Field(min_length=3, max_length=5000)
 
     @model_validator(mode="after")
@@ -60,6 +61,11 @@ class BoundaryVersionRead(BaseModel):
     input_hash: str
     created_at: datetime
 
+
+class AssessmentCreate(BaseModel):
+    has_possession_proof: bool = False
+    intends_restoration: bool = False
+    recent_clearing: bool = False
 
 class AssessmentInput(BaseModel):
     property_id: UUID

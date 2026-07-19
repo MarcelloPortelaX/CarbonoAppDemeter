@@ -18,7 +18,7 @@ export default function Home() {
   const pendingOperations = usePropertyStore((state) => state.outbox.length);
   const passports = usePropertyStore((state) => state.passports);
   const hydrated = usePropertyStore((state) => state.hydrated);
-  const createProperty = usePropertyStore((state) => state.createProperty);
+  const createProperty = usePropertyStore((state) => state.createPropertyDraft);
   const [searchVisible, setSearchVisible] = useState(false);
   const [query, setQuery] = useState('');
   const [filterPending, setFilterPending] = useState(false);

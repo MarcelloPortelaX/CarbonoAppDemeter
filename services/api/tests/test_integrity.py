@@ -1,9 +1,10 @@
 from uuid import uuid4
+
 from app.application.passport_service import build_passport
 from app.domain.eligibility import assess
 from app.domain.integrity import GateStatus, IntegrityGateSet
 from app.domain.provenance import ResultMaturity
-from app.domain.schemas import LandUse, AssessmentInput
+from app.domain.schemas import AssessmentInput, LandUse
 
 
 def sample_property() -> AssessmentInput:

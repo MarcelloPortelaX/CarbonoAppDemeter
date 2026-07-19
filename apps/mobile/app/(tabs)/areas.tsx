@@ -11,7 +11,7 @@ export default function Areas() {
   const { theme } = useDemeterTheme();
   const properties = usePropertyStore((state) => state.properties);
   const pending = usePropertyStore((state) => state.outbox.length);
-  const createProperty = usePropertyStore((state) => state.createProperty);
+  const createProperty = usePropertyStore((state) => state.createPropertyDraft);
   const startProperty = () => {
     const id = createProperty();
     router.push({ pathname: '/property/[id]/map', params: { id } });

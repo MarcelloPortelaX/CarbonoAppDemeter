@@ -1,11 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_repository
-from app.application.postgres_repository import PostgresRepository
 from app.application.passport_service import build_passport
-from app.domain.eligibility import assess
+from app.application.postgres_repository import PostgresRepository
 from app.domain.passport import PassportRead
 
 router = APIRouter()
@@ -18,5 +17,12 @@ async def get_passport(
     property_data = await repo.get_property(property_id)
     if property_data is None:
         raise HTTPException(status_code=404, detail="property not found")
-    assessment = assess(property_data)
+        
+    assessment = await repo.latest_assessment(property_id)
+    if assessment is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="assessment_required"
+        )
+        
     return build_passport(assessment)

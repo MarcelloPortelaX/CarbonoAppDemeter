@@ -1,18 +1,51 @@
-export type PropertyStatus = 'analysis' | 'documentation' | 'eligible' | 'review';
+import { z } from 'zod';
+
+export type PropertyStatus = 'draft' | 'analysis' | 'documentation' | 'eligible' | 'review';
 export type CarbonResultState = 'blocked' | 'demo' | 'screening' | 'validated';
 export type SyncStatus = 'local' | 'pending' | 'synced' | 'error';
 
 export type Coordinate = { latitude: number; longitude: number };
 
+export const LandUseSchema = z.enum([
+  'degraded_pasture',
+  'agriculture',
+  'abandoned',
+  'agroforestry',
+  'native_vegetation',
+]);
+export type LandUse = z.infer<typeof LandUseSchema>;
+
+export const ApiPropertyReadSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  municipality: z.string(),
+  land_use: LandUseSchema,
+  version: z.number().int(),
+  created_at: z.string(),
+});
+export type ApiPropertyRead = z.infer<typeof ApiPropertyReadSchema>;
+
+export const ApiBoundaryVersionReadSchema = z.object({
+  id: z.string().uuid(),
+  property_id: z.string().uuid(),
+  version: z.number().int(),
+  area_ha: z.number(),
+  perimeter_km: z.number(),
+  input_hash: z.string(),
+  created_at: z.string(),
+});
+export type ApiBoundaryVersionRead = z.infer<typeof ApiBoundaryVersionReadSchema>;
+
 export type PropertySummary = {
   id: string;
-  name: string;
-  municipality: string;
-  state: string;
+  name: string | null;
+  municipality: string | null;
+  state: string | null;
   areaHa: number;
   status: PropertyStatus;
-  landUse: string;
+  landUse: LandUse | null;
   boundary: Coordinate[];
+  boundaryId?: string; // Stable UUID for boundary version
   syncStatus: SyncStatus;
   createdAt: string;
   demo?: boolean;
@@ -29,10 +62,51 @@ export type Passport = {
   disclaimer: string;
 };
 
-export type SyncOperation = {
+// Immutable Operations
+export type ApiPropertyCreate = {
   id: string;
-  propertyId: string;
-  kind: 'create_property' | 'update_boundary' | 'confirm_boundary';
-  createdAt: string;
-  attempt: number;
+  name: string;
+  municipality: string;
+  land_use: LandUse;
 };
+
+export type ApiBoundaryCreate = {
+  boundary_id?: string;
+  points: Coordinate[];
+};
+
+export type CreatePropertyOperation = {
+  id: string;
+  kind: 'create_property';
+  propertyId: string;
+  payload: ApiPropertyCreate;
+  status: 'pending' | 'retryable' | 'failed';
+  attempt: number;
+  createdAt: string;
+  lastError?: string;
+};
+
+export type UpdateBoundaryOperation = {
+  id: string;
+  kind: 'update_boundary';
+  propertyId: string;
+  boundaryId: string;
+  payload: ApiBoundaryCreate;
+  status: 'pending' | 'retryable' | 'failed';
+  attempt: number;
+  createdAt: string;
+  lastError?: string;
+};
+
+export type ConfirmBoundaryOperation = {
+  id: string;
+  kind: 'confirm_boundary';
+  propertyId: string;
+  boundaryId: string;
+  status: 'pending' | 'retryable' | 'failed';
+  attempt: number;
+  createdAt: string;
+  lastError?: string;
+};
+
+export type SyncOperation = CreatePropertyOperation | UpdateBoundaryOperation | ConfirmBoundaryOperation;
