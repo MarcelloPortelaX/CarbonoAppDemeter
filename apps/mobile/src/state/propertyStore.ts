@@ -5,8 +5,9 @@ import { passports as demoPassports, properties as demoProperties } from '../dat
 import type { Coordinate, Passport, PropertySummary, SyncOperation } from '../domain/models';
 import { areaHectares } from '../utils/geo';
 
-const identifier = () =>
-  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+import * as Crypto from 'expo-crypto';
+
+const identifier = () => Crypto.randomUUID();
 
 const queueOperation = (
   outbox: SyncOperation[],
@@ -40,7 +41,7 @@ export const usePropertyStore = create<PropertyState>()(
       outbox: [],
       setHydrated: (hydrated) => set({ hydrated }),
       createProperty: () => {
-        const id = `area-${identifier()}`;
+        const id = identifier();
         const property: PropertySummary = {
           id,
           name: 'Nova área',

@@ -19,7 +19,7 @@ export default function Passport() {
   const { theme } = useDemeterTheme();
   const property = usePropertyStore((state) => state.properties.find((item) => item.id === id));
   const localPassport = usePropertyStore((state) => (id ? state.passports[id] : undefined));
-  const [remotePassport, setRemotePassport] = useState<any>(null);
+  const [remotePassport, setRemotePassport] = useState<Passport | null>(null);
 
   useEffect(() => {
     if (id && property?.syncStatus === 'synced') {
