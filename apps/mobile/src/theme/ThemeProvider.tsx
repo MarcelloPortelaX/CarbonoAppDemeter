@@ -40,9 +40,7 @@ export function DemeterThemeProvider({ children }: React.PropsWithChildren) {
 
     if (Platform.OS === 'android') {
       try {
-        NavigationBar.setStyleAsync(resolved === 'dark' ? 'dark' : 'light').catch((err) => {
-          console.warn('NavigationBar style failed:', err);
-        });
+        NavigationBar.setStyle(resolved === 'dark' ? 'dark' : 'light');
       } catch (err) {
         console.warn('NavigationBar sync failed:', err);
       }

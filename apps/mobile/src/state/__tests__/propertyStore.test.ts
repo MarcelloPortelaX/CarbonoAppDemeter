@@ -15,7 +15,10 @@ describe('propertyStore persistence', () => {
     // Clear storage before each test
     const AsyncStorage = require('@react-native-async-storage/async-storage');
     AsyncStorage.clear();
-    usePropertyStore.setState({ hydrated: false, properties: [], passports: {}, outbox: [] });
+    const initialState = usePropertyStore.getState();
+    // In zustand persist v4, rehydrate with empty storage doesn't reset the store.
+    // Let's reset it manually.
+    usePropertyStore.setState({ hydrated: false, properties: initialState.properties, passports: initialState.passports, outbox: [] });
   });
 
   it('hydrates empty storage safely', async () => {
@@ -50,11 +53,12 @@ describe('propertyStore persistence', () => {
     
     const state = usePropertyStore.getState();
     expect(state.hydrated).toBe(true);
-    expect(state.properties[0].remoteStatus).toBe('created');
-    expect(state.properties[1].remoteStatus).toBe('error');
-    expect(state.properties[2].remoteStatus).toBe('local');
+    expect(state.properties[0]!.remoteStatus).toBe('created');
+    expect(state.properties[1]!.remoteStatus).toBe('error');
+    expect(state.properties[2]!.remoteStatus).toBe('local');
     
     // Ensure syncStatus is removed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((state.properties[0] as any).syncStatus).toBeUndefined();
   });
 

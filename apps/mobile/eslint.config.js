@@ -1,10 +1,9 @@
-const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 const reactHooks = require('eslint-plugin-react-hooks');
 const typescriptEslint = require('@typescript-eslint/eslint-plugin');
 
-module.exports = defineConfig([
-  expoConfig,
+module.exports = [
+  ...expoConfig,
   {
     ignores: ['.expo/**', 'dist/**'],
     plugins: {
@@ -13,7 +12,13 @@ module.exports = defineConfig([
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
-      'react-hooks/exhaustive-deps': 'warn'
+      'react-hooks/exhaustive-deps': 'warn',
+      'react/display-name': 'off'
+    },
+    settings: {
+      react: {
+        version: '19.2.3'
+      }
     }
   }
-]);
+];

@@ -42,17 +42,19 @@ describe('syncWorker - submit_assessment', () => {
     createdAt: new Date().toISOString()
   });
 
+  const dummyAssessmentPayload = { has_possession_proof: true, intends_restoration: true, recent_clearing: false };
+
   it('blocks submit_assessment if property is not synced (remoteStatus !== created)', async () => {
     usePropertyStore.setState({
       properties: [createDummyProperty('p1', 'local')],
-      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: { year: 2024 }, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
+      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: dummyAssessmentPayload, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
     });
 
     await processOutbox();
     
     expect(mockedApi.submitAssessment).not.toHaveBeenCalled();
     const ops = usePropertyStore.getState().outbox;
-    expect(ops).toHaveLength(1); // not removed
+    expect(ops).toHaveLength(1);
   });
 
   it('blocks submit_assessment if there are pending boundary operations', async () => {
@@ -60,11 +62,11 @@ describe('syncWorker - submit_assessment', () => {
       properties: [createDummyProperty('p1', 'created')],
       outbox: [
         { id: 'op1', kind: 'confirm_boundary', propertyId: 'p1', boundaryId: 'b1', status: 'pending', attempt: 0, createdAt: new Date().toISOString() },
-        { id: 'op2', kind: 'submit_assessment', propertyId: 'p1', payload: { year: 2024 }, status: 'pending', attempt: 0, createdAt: new Date().toISOString() },
+        { id: 'op2', kind: 'submit_assessment', propertyId: 'p1', payload: dummyAssessmentPayload, status: 'pending', attempt: 0, createdAt: new Date().toISOString() },
       ],
     });
     
-    mockedApi.confirmBoundary.mockResolvedValueOnce({ boundary_id: 'b1', points: [] });
+    mockedApi.confirmBoundary.mockResolvedValueOnce({ property_id: 'p1', boundary_id: 'b1', is_confirmed: true });
 
     await processOutbox();
     
@@ -74,7 +76,7 @@ describe('syncWorker - submit_assessment', () => {
   it('removes submit_assessment after success', async () => {
     usePropertyStore.setState({
       properties: [createDummyProperty('p1', 'created')],
-      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: { year: 2024 }, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
+      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: dummyAssessmentPayload, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
     });
     
     mockedApi.submitAssessment.mockResolvedValueOnce(undefined);
@@ -89,7 +91,7 @@ describe('syncWorker - submit_assessment', () => {
   it('marks submit_assessment retryable on network error', async () => {
     usePropertyStore.setState({
       properties: [createDummyProperty('p1', 'created')],
-      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: { year: 2024 }, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
+      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: dummyAssessmentPayload, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
     });
     
     mockedApi.submitAssessment.mockRejectedValueOnce(new Error('Network request failed'));
@@ -98,13 +100,13 @@ describe('syncWorker - submit_assessment', () => {
     
     expect(mockedApi.submitAssessment).toHaveBeenCalled();
     const ops = usePropertyStore.getState().outbox;
-    expect(ops[0].status).toBe('retryable');
+    expect(ops[0]!.status).toBe('retryable');
   });
 
   it('marks submit_assessment failed on 422', async () => {
     usePropertyStore.setState({
       properties: [createDummyProperty('p1', 'created')],
-      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: { year: 2024 }, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
+      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: dummyAssessmentPayload, status: 'pending', attempt: 0, createdAt: new Date().toISOString() }],
     });
     
     mockedApi.submitAssessment.mockRejectedValueOnce(new api.ApiError('Invalid data', 422));
@@ -113,19 +115,19 @@ describe('syncWorker - submit_assessment', () => {
     
     expect(mockedApi.submitAssessment).toHaveBeenCalled();
     const ops = usePropertyStore.getState().outbox;
-    expect(ops[0].status).toBe('failed');
+    expect(ops[0]!.status).toBe('failed');
   });
 
   it('does not re-execute failed operations', async () => {
     usePropertyStore.setState({
       properties: [createDummyProperty('p1', 'created')],
-      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: { year: 2024 }, status: 'failed', attempt: 1, createdAt: new Date().toISOString() }],
+      outbox: [{ id: 'op1', kind: 'submit_assessment', propertyId: 'p1', payload: dummyAssessmentPayload, status: 'failed', attempt: 1, createdAt: new Date().toISOString() }],
     });
     
     await processOutbox();
     
     expect(mockedApi.submitAssessment).not.toHaveBeenCalled();
     const ops = usePropertyStore.getState().outbox;
-    expect(ops[0].status).toBe('failed'); // remains failed
+    expect(ops[0]!.status).toBe('failed');
   });
 });

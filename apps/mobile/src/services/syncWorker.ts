@@ -127,6 +127,9 @@ export async function processOutbox() {
         }
       }
     }
+    }
+  } catch (error) {
+    console.error('Unhandled error in syncWorker:', error);
   } finally {
     isProcessing = false;
   }

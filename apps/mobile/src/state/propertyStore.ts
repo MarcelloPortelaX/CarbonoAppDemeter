@@ -249,23 +249,26 @@ export const usePropertyStore = create<PropertyState>()(
       migrate: (persistedState: unknown, version: number) => {
         try {
           if (!persistedState || typeof persistedState !== 'object') {
-            return { properties: [], passports: {}, outbox: [] };
+            return { properties: demoProperties, passports: demoPassports, outbox: [] } as unknown as PropertyState;
           }
           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let state = persistedState as any;
           
           if (version < 3) {
             // Convert syncStatus to remoteStatus
-            state.properties = (state.properties || []).map((p: any) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            state.properties = Array.isArray(state.properties) ? state.properties.map((p: any) => {
               const remoteStatus = p.syncStatus === 'synced' ? 'created' : (p.syncStatus === 'error' ? 'error' : 'local');
               delete p.syncStatus;
               return { ...p, remoteStatus };
-            });
+            }) : [];
             // For operations, mark unknown ones as failed, though they should be compatible
-            state.outbox = (state.outbox || []).map((op: any) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            state.outbox = Array.isArray(state.outbox) ? state.outbox.map((op: any) => ({
               ...op,
               status: op.status === 'failed' ? 'failed' : op.status || 'pending'
-            }));
+            })) : [];
           }
           
           // Ensure arrays/objects exist
@@ -276,7 +279,7 @@ export const usePropertyStore = create<PropertyState>()(
           return state as PropertyState;
         } catch (e) {
           console.warn('Failed to migrate state, resetting to default', e);
-          return { properties: [], passports: {}, outbox: [] } as PropertyState;
+          return undefined as unknown as PropertyState;
         }
       },
       onRehydrateStorage: () => (state, error) => {
