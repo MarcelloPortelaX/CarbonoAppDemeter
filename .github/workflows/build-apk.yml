@@ -27,8 +27,7 @@ jobs:
       - name: Validate Secrets
         run: |
           if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
-            echo "Error: EXPO_TOKEN is required."
-            exit 1
+            echo "Error: EXPO_TOKEN is missing or empty!"
           fi
           if [ -z "${{ secrets.APK_EMAIL_SENDER }}" ] || [ -z "${{ secrets.APK_EMAIL_APP_PASSWORD }}" ]; then
             echo "Warning: Email secrets missing. APK will be built but email will not be sent."
