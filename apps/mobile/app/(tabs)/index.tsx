@@ -50,7 +50,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 28, gap: 14 },
+  content: { padding: 16, paddingBottom: 28, gap: 12 },
   search: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, fontFamily: 'Inter_400Regular', fontSize: 14 },
   loader: { marginVertical: 36 },
   list: { gap: 10 },

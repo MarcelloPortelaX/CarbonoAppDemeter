@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   hit: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 17, textAlign: 'center' },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 120 },
   identityText: { flex: 1 },
   property: { fontFamily: 'Inter_700Bold', fontSize: 18 },
   city: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },

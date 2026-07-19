@@ -38,7 +38,7 @@ export function SummaryCard({ properties, pendingOperations }: { properties: Pro
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 16, gap: 16, overflow: 'hidden' },
+  card: { padding: 16, gap: 16, overflow: 'hidden', minHeight: 250 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   kicker: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   period: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, flexDirection: 'row', gap: 4, alignItems: 'center' },
