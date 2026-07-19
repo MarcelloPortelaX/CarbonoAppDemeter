@@ -1,18 +1,16 @@
 import os
 from uuid import uuid4
-
 import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from app.api.deps import get_db
+from app.main import app
 
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.asyncio,
 ]
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-from app.api.deps import get_db
-from app.main import app
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
@@ -40,7 +38,6 @@ async def clear_db():
         await conn.execute(text("TRUNCATE TABLE audit_events_v2, evidence, calculation_runs, boundary_versions, assessments, properties CASCADE;"))
     yield
 
-@pytest.mark.asyncio
 async def test_create_property_idempotent():
     property_id = str(uuid4())
     payload = {
@@ -69,9 +66,7 @@ async def test_create_property_idempotent():
         list_response = await ac.get("/api/v1/properties")
         assert len(list_response.json()) == 1
 
-@pytest.mark.asyncio
 
-@pytest.mark.asyncio
 async def test_create_boundary():
     property_id = str(uuid4())
     payload = {"id": property_id, "name": "Integration Farm", "municipality": "Test City", "land_use": "agriculture"}
@@ -126,7 +121,6 @@ async def test_create_boundary():
         assert res_new.json()["version"] == 2
 
 
-@pytest.mark.asyncio
 async def test_confirm_boundary():
     property_id = str(uuid4())
     prop_payload = {"id": property_id, "name": "Integration Farm", "municipality": "Test City", "land_use": "agriculture"}
@@ -174,7 +168,6 @@ async def test_confirm_boundary():
             assert not row1[0]
             assert row2[0]
 
-@pytest.mark.asyncio
 async def test_assessment_idempotency():
     property_id = str(uuid4())
     prop_payload = {"id": property_id, "name": "Integration Farm", "municipality": "Test City", "land_use": "agriculture"}
@@ -198,7 +191,7 @@ async def test_assessment_idempotency():
         assert res_422.status_code == 422
         
         # Test Passport before assessment -> 409
-        res_pass_before = await ac.get(f"/api/v1/passports/{property_id}")
+        res_pass_before = await ac.get(f"/api/v1/passports/properties/{property_id}")
         assert res_pass_before.status_code == 409
 
         # Test successful submission
@@ -215,7 +208,7 @@ async def test_assessment_idempotency():
         assert data1["created_at"] == data2["created_at"]
         
         # Test Passport after assessment -> 200
-        res_pass_after = await ac.get(f"/api/v1/passports/{property_id}")
+        res_pass_after = await ac.get(f"/api/v1/passports/properties/{property_id}")
         assert res_pass_after.status_code == 200
         
         async with engine.begin() as conn:
