@@ -93,7 +93,7 @@ class PostgresRepository:
         try:
             poly = Polygon(coords)
         except Exception as e:
-            raise HTTPException(status_code=422, detail=f"invalid geometry: {e}")
+            raise HTTPException(status_code=422, detail=f"invalid geometry: {e}") from e
 
         if not poly.is_valid:
             raise HTTPException(status_code=422, detail="geometry is invalid (e.g. self-intersecting)")

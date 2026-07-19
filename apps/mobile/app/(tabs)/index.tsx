@@ -13,6 +13,7 @@ import { usePropertyStore } from '../../src/state/propertyStore';
 import { useDemeterTheme } from '../../src/theme/ThemeProvider';
 
 export default function Home() {
+  console.log('BOOT: home');
   const { theme } = useDemeterTheme();
   const properties = usePropertyStore((state) => state.properties);
   const pendingOperations = usePropertyStore((state) => state.outbox.length);

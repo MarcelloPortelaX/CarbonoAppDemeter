@@ -18,6 +18,7 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function DemeterThemeProvider({ children }: React.PropsWithChildren) {
+  console.log('BOOT: theme provider');
   const system = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [mode, setModeState] = useState<ThemeMode>('system');
   const resolved: ResolvedTheme = mode === 'system' ? system : mode;

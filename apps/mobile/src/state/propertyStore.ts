@@ -279,13 +279,19 @@ export const usePropertyStore = create<PropertyState>()(
           return state as PropertyState;
         } catch (e) {
           console.warn('Failed to migrate state, resetting to default', e);
-          return undefined as unknown as PropertyState;
+          return {
+            hydrated: true, // will be handled by onRehydrateStorage but safe to have
+            properties: demoProperties,
+            passports: demoPassports,
+            outbox: [],
+          } as unknown as PropertyState;
         }
       },
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           console.warn('Failed to hydrate state', error);
         }
+        console.log('BOOT: store hydration');
         usePropertyStore.setState({ hydrated: true });
       },
     },

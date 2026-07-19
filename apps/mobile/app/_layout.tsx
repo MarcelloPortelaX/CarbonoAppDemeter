@@ -26,24 +26,34 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    console.log('BOOT: fonts ready', fontsLoaded);
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync().catch(() => undefined);
     }
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      processOutbox().catch((error) => {
-        console.warn('Não foi possível processar a sincronização:', error);
-      });
-    }, 15000);
-
-    return () => clearInterval(interval);
+    let mounted = true;
+    const loop = async () => {
+      if (!mounted) return;
+      try {
+        await processOutbox();
+      } catch (error) {
+         console.warn('Não foi possível processar a sincronização:', error);
+      }
+      if (mounted) {
+        setTimeout(loop, 15000);
+      }
+    };
+    loop();
+    return () => { mounted = false; };
   }, []);
 
   if (!fontsLoaded && !fontError) {
     return null;
   }
+
+  console.log('BOOT: root layout');
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

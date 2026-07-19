@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_repository
 from app.application.postgres_repository import PostgresRepository
-from app.domain.schemas import BoundaryConfirmationRead, BoundaryCreate, BoundaryVersionRead, PropertyCreate, PropertyRead
+from app.domain.schemas import (
+    BoundaryConfirmationRead,
+    BoundaryCreate,
+    BoundaryVersionRead,
+    PropertyCreate,
+    PropertyRead,
+)
 
 router = APIRouter()
 
