@@ -60,7 +60,7 @@ export default function PropertyMap() {
       return;
     }
     confirmBoundary(property.id);
-    router.replace({ pathname: '/passport/[id]', params: { id: property.id } });
+    router.replace({ pathname: '/property/[id]/assessment', params: { id: property.id } });
   };
 
   if (!property) {

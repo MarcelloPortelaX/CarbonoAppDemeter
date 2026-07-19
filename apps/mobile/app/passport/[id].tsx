@@ -13,7 +13,7 @@ import { SurfaceCard } from '../../src/components/SurfaceCard';
 import { usePropertyStore } from '../../src/state/propertyStore';
 import { useDemeterTheme } from '../../src/theme/ThemeProvider';
 import { getPassport } from '../../src/services/api';
-import { Passport as PassportModel } from '../../src/domain/models';
+import { Passport as PassportModel, ApiPassportRead } from '../../src/domain/models';
 
 export default function Passport() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,12 +23,37 @@ export default function Passport() {
   const [remotePassport, setRemotePassport] = useState<PassportModel | null>(null);
 
   useEffect(() => {
-    if (id && property?.syncStatus === 'synced') {
+    if (id && property?.remoteStatus !== 'local') {
       getPassport(id)
-        .then((data) => setRemotePassport(data))
+        .then((data: ApiPassportRead) => {
+          const statusMap: Record<string, PassportModel['status']> = {
+            'potential': 'eligible',
+            'needs_review': 'review',
+            'not_ready': 'analysis'
+          };
+          
+          const stageMap: Record<string, number> = {
+            'screening': 1,
+            'documentation': 2,
+            'review': 3,
+            'validation': 4
+          };
+
+          const mapped: PassportModel = {
+            propertyId: data.property_id,
+            status: statusMap[data.eligibility] || 'analysis',
+            resultState: data.stage === 'screening' ? 'blocked' : 'demo',
+            demoPotentialTco2e: data.scenario.potential_tco2e_per_year ?? undefined,
+            horizonYears: data.scenario.horizon_years ?? undefined,
+            pendingCount: data.pending.length,
+            currentStep: (stageMap[data.stage] || 0) as 0|1|2|3|4,
+            disclaimer: data.scenario.disclaimer
+          };
+          setRemotePassport(mapped);
+        })
         .catch((e) => console.warn('Failed to load remote passport:', e));
     }
-  }, [id, property?.syncStatus]);
+  }, [id, property?.remoteStatus]);
 
   const passport = remotePassport || localPassport;
 

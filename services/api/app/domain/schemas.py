@@ -62,6 +62,12 @@ class BoundaryVersionRead(BaseModel):
     created_at: datetime
 
 
+class BoundaryConfirmationRead(BaseModel):
+    property_id: UUID
+    boundary_id: UUID
+    is_confirmed: bool
+
+
 class AssessmentCreate(BaseModel):
     has_possession_proof: bool = False
     intends_restoration: bool = False

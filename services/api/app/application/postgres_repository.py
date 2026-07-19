@@ -11,6 +11,7 @@ from app.domain.schemas import (
     AssessmentRead,
     BoundaryCreate,
     BoundaryVersionRead,
+    BoundaryConfirmationRead,
     LandUse,
     PropertyCreate,
     PropertyRead,
@@ -23,22 +24,27 @@ class PostgresRepository:
         self.session = session
 
     async def save_property(self, creation_request: PropertyCreate) -> PropertyRead:
+        # Lock not strictly needed for insert, but let's check existing
+        result = await self.session.execute(select(PropertyModel).filter_by(id=creation_request.id))
+        existing = result.scalar_one_or_none()
+        land_use_val = creation_request.land_use.value if hasattr(creation_request.land_use, 'value') else creation_request.land_use
+        
+        if existing:
+            if existing.name == creation_request.name and existing.municipality == creation_request.municipality and existing.land_use == land_use_val:
+                return await self.get_property(creation_request.id) # type: ignore
+            raise HTTPException(status_code=409, detail="Property with same ID but different canonical content already exists")
+
         stmt = insert(PropertyModel).values(
             id=creation_request.id,
             name=creation_request.name,
             municipality=creation_request.municipality,
-            land_use=creation_request.land_use.value if hasattr(creation_request.land_use, 'value') else creation_request.land_use,
+            land_use=land_use_val,
             version=1
         )
-        
-        stmt = stmt.on_conflict_do_nothing(index_elements=['id'])
         await self.session.execute(stmt)
         await self.session.commit()
         
-        result = await self.get_property(creation_request.id)
-        if result is None:
-            raise HTTPException(status_code=500, detail="Failed to save property")
-        return result
+        return await self.get_property(creation_request.id) # type: ignore
 
     async def get_property(self, property_id: UUID) -> PropertyRead | None:
         result = await self.session.execute(select(PropertyModel).filter_by(id=property_id))
@@ -69,22 +75,63 @@ class PostgresRepository:
         ]
 
     async def save_boundary(self, property_id: UUID, boundary_request: BoundaryCreate) -> BoundaryVersionRead:
-        unique_points = []
-        for p in boundary_request.points:
-            if not unique_points or (unique_points[-1].latitude != p.latitude or unique_points[-1].longitude != p.longitude):
-                unique_points.append(p)
-        if unique_points and unique_points[0].latitude == unique_points[-1].latitude and unique_points[0].longitude == unique_points[-1].longitude:
-            unique_points.pop()
+        from shapely.geometry import Polygon, MultiPolygon
+        from shapely.validation import make_valid
+        
+        if not boundary_request.boundary_id:
+            raise HTTPException(status_code=422, detail="boundary_id is required for idempotency")
+            
+        if len(boundary_request.points) < 3:
+            raise HTTPException(status_code=422, detail="polygon requires at least three points")
 
-        if len(unique_points) < 3:
-            raise HTTPException(status_code=422, detail="polygon requires at least three distinct points")
+        coords = [(p.longitude, p.latitude) for p in boundary_request.points]
+        if coords[0] != coords[-1]:
+            coords.append(coords[0])
+            
+        try:
+            poly = Polygon(coords)
+            if not poly.is_valid:
+                poly = make_valid(poly)
+                
+            if poly.is_empty:
+                raise HTTPException(status_code=422, detail="geometry is empty after validation")
+                
+            if poly.geom_type == 'Polygon':
+                poly = MultiPolygon([poly])
+            elif poly.geom_type != 'MultiPolygon':
+                raise HTTPException(status_code=422, detail=f"invalid geometry type resulting: {poly.geom_type}")
+                
+            if poly.area == 0:
+                raise HTTPException(status_code=422, detail="polygon has zero area")
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"invalid geometry: {e}")
 
-        min_idx = min(range(len(unique_points)), key=lambda i: (unique_points[i].latitude, unique_points[i].longitude))
-        rotated = unique_points[min_idx:] + unique_points[:min_idx]
+        # WKT is normalized by Shapely (orientation, etc.)
+        wkt_str = poly.wkt
+        input_hash = canonical_hash({"wkt": wkt_str})
+        
+        boundary_id = boundary_request.boundary_id
 
-        payload_dict = {"points": [{"lat": p.latitude, "lon": p.longitude} for p in rotated]}
-        input_hash = canonical_hash(payload_dict)
+        # Lock the property for concurrency safety on version number
+        await self.session.execute(select(PropertyModel.id).filter_by(id=property_id).with_for_update())
 
+        result = await self.session.execute(select(BoundaryVersionModel).filter_by(id=boundary_id))
+        existing_version = result.scalar_one_or_none()
+        
+        if existing_version:
+            if existing_version.input_hash == input_hash:
+                return BoundaryVersionRead(
+                    id=existing_version.id,
+                    property_id=existing_version.property_id,
+                    version=existing_version.version,
+                    area_ha=existing_version.area_ha,
+                    perimeter_km=existing_version.perimeter_km,
+                    input_hash=existing_version.input_hash,
+                    created_at=existing_version.created_at
+                )
+            raise HTTPException(status_code=409, detail="Boundary with same ID but different geometry already exists")
+
+        # Get latest version for this property
         result = await self.session.execute(
             select(BoundaryVersionModel)
             .filter_by(property_id=property_id)
@@ -92,29 +139,13 @@ class PostgresRepository:
             .limit(1)
         )
         latest_boundary = result.scalar_one_or_none()
-        
-        # Avoid duplication of geometry
-        if latest_boundary and latest_boundary.input_hash == input_hash:
-            # If the user sends a new boundary_id but same geometry, we might want to still return the old one
-            return BoundaryVersionRead(
-                id=latest_boundary.id,
-                property_id=latest_boundary.property_id,
-                version=latest_boundary.version,
-                area_ha=latest_boundary.area_ha,
-                perimeter_km=latest_boundary.perimeter_km,
-                input_hash=latest_boundary.input_hash,
-                created_at=latest_boundary.created_at
-            )
-            
         new_version = (latest_boundary.version + 1) if latest_boundary else 1
-        
-        coords = [f"{p.longitude} {p.latitude}" for p in unique_points]
-        coords.append(coords[0]) # close ring
-        wkt = f"SRID=4326;POLYGON(({', '.join(coords)}))"
-        geom = WKTElement(wkt, srid=4326)
+
+        ewkt = f"SRID=4326;{wkt_str}"
+        geom = WKTElement(ewkt, srid=4326)
 
         new_boundary = BoundaryVersionModel(
-            id=boundary_request.boundary_id or uuid4(),
+            id=boundary_id,
             property_id=property_id,
             version=new_version,
             geometry=geom,
@@ -128,7 +159,6 @@ class PostgresRepository:
         await self.session.commit()
         await self.session.refresh(new_boundary)
         
-        # Actually better to just use raw SQL for the update to avoid type hinting issues:
         await self.session.execute(
             func.text("UPDATE boundary_versions SET area_ha = ST_Area(geometry::geography) / 10000, perimeter_km = ST_Perimeter(geometry::geography) / 1000 WHERE id = :id")
             .bindparams(id=new_boundary.id)
@@ -146,7 +176,7 @@ class PostgresRepository:
             created_at=new_boundary.created_at
         )
 
-    async def confirm_boundary(self, property_id: UUID, boundary_id: UUID) -> None:
+    async def confirm_boundary(self, property_id: UUID, boundary_id: UUID) -> BoundaryConfirmationRead:
         property_record = await self.get_property(property_id)
         if not property_record:
             raise HTTPException(status_code=404, detail="property not found")
@@ -166,6 +196,7 @@ class PostgresRepository:
             func.text("UPDATE boundary_versions SET is_confirmed = true WHERE id = :id").bindparams(id=boundary_id)
         )
         await self.session.commit()
+        return BoundaryConfirmationRead(property_id=property_id, boundary_id=boundary_id, is_confirmed=True)
 
     async def save_assessment(self, item: AssessmentRead) -> AssessmentRead:
         stmt = insert(AssessmentModel).values(

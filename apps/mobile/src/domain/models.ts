@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export type PropertyStatus = 'draft' | 'analysis' | 'documentation' | 'eligible' | 'review';
 export type CarbonResultState = 'blocked' | 'demo' | 'screening' | 'validated';
-export type SyncStatus = 'local' | 'pending' | 'synced' | 'error';
+export type RemoteStatus = 'local' | 'created' | 'error';
 
 export type Coordinate = { latitude: number; longitude: number };
 
@@ -36,6 +36,38 @@ export const ApiBoundaryVersionReadSchema = z.object({
 });
 export type ApiBoundaryVersionRead = z.infer<typeof ApiBoundaryVersionReadSchema>;
 
+export const ApiBoundaryConfirmationReadSchema = z.object({
+  property_id: z.string().uuid(),
+  boundary_id: z.string().uuid(),
+  is_confirmed: z.boolean(),
+});
+export type ApiBoundaryConfirmationRead = z.infer<typeof ApiBoundaryConfirmationReadSchema>;
+
+export const ApiAssessmentCreateSchema = z.object({
+  has_possession_proof: z.boolean(),
+  intends_restoration: z.boolean(),
+  recent_clearing: z.boolean(),
+});
+export type ApiAssessmentCreate = z.infer<typeof ApiAssessmentCreateSchema>;
+
+export const ApiPassportReadSchema = z.object({
+  id: z.string().uuid(),
+  property_id: z.string().uuid(),
+  eligibility: z.string(),
+  stage: z.string(),
+  pending: z.array(z.string()),
+  integrity: z.number(),
+  scenario: z.object({
+    description: z.string(),
+    disclaimer: z.string(),
+    potential_tco2e_per_year: z.number().nullable(),
+    horizon_years: z.number().nullable(),
+  }),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type ApiPassportRead = z.infer<typeof ApiPassportReadSchema>;
+
 export type PropertySummary = {
   id: string;
   name: string | null;
@@ -46,7 +78,7 @@ export type PropertySummary = {
   landUse: LandUse | null;
   boundary: Coordinate[];
   boundaryId?: string; // Stable UUID for boundary version
-  syncStatus: SyncStatus;
+  remoteStatus: RemoteStatus;
   createdAt: string;
   demo?: boolean;
 };

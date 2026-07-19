@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_repository
 from app.application.postgres_repository import PostgresRepository
-from app.domain.schemas import BoundaryCreate, BoundaryVersionRead, PropertyCreate, PropertyRead
+from app.domain.schemas import BoundaryCreate, BoundaryVersionRead, BoundaryConfirmationRead, PropertyCreate, PropertyRead
 
 router = APIRouter()
 
@@ -41,11 +41,8 @@ async def create_boundary(
         
     return await repo.save_boundary(property_id, boundary_request)
 
-@router.post("/{property_id}/boundaries/confirm", status_code=status.HTTP_200_OK)
+@router.post("/{property_id}/boundaries/{boundary_id}/confirm", response_model=BoundaryConfirmationRead, status_code=status.HTTP_200_OK)
 async def confirm_boundary(
-    property_id: UUID, repo: PostgresRepository = Depends(get_repository)
-):
-    property_record = await repo.get_property(property_id)
-    if property_record is None:
-        raise HTTPException(status_code=404, detail="property not found")
-    return {"status": "confirmed"}
+    property_id: UUID, boundary_id: UUID, repo: PostgresRepository = Depends(get_repository)
+) -> BoundaryConfirmationRead:
+    return await repo.confirm_boundary(property_id, boundary_id)

@@ -7,7 +7,7 @@ import type {
   Passport, 
   PropertySummary, 
   SyncOperation, 
-  SyncStatus,
+  RemoteStatus,
   ApiPropertyCreate,
   ApiBoundaryCreate
 } from '../domain/models';
@@ -20,6 +20,34 @@ export function isPropertyReadyForSync(property: PropertySummary): boolean {
   if (!property.name || !property.municipality || !property.landUse) return false;
   return true;
 }
+
+const queueOrUpdateBoundaryOperation = (
+  outbox: SyncOperation[],
+  propertyId: string,
+  boundaryId: string,
+  points: Coordinate[]
+) => {
+  // If there's already an un-synced update_boundary for this boundaryId, just update its payload
+  const existingIndex = outbox.findIndex(op => op.kind === 'update_boundary' && op.propertyId === propertyId && op.boundaryId === boundaryId);
+  if (existingIndex >= 0) {
+    const newOutbox = [...outbox];
+    const op = newOutbox[existingIndex] as UpdateBoundaryOperation;
+    newOutbox[existingIndex] = { ...op, payload: { boundary_id: boundaryId, points } };
+    return newOutbox;
+  }
+  
+  // Otherwise, queue a new one
+  return queueOperation(outbox, {
+    id: identifier(),
+    propertyId,
+    boundaryId,
+    kind: 'update_boundary',
+    payload: { boundary_id: boundaryId, points },
+    createdAt: new Date().toISOString(),
+    attempt: 0,
+    status: 'pending',
+  });
+};
 
 const queueOperation = (
   outbox: SyncOperation[],
@@ -42,10 +70,10 @@ type PropertyState = {
   undoBoundaryPoint: (propertyId: string) => void;
   confirmBoundary: (propertyId: string) => void;
   removeOperation: (operationId: string) => void;
-  updateSyncStatus: (propertyId: string, status: SyncStatus) => void;
+  updateRemoteStatus: (propertyId: string, status: RemoteStatus) => void;
   setBoundaryId: (propertyId: string, boundaryId: string) => void;
   incrementOperationAttempt: (operationId: string) => void;
-  markOperationFailed: (operationId: string, error: string) => void;
+  updateOperationStatus: (operationId: string, status: 'pending' | 'retryable' | 'failed', error?: string) => void;
 };
 
 export const usePropertyStore = create<PropertyState>()(
@@ -67,7 +95,7 @@ export const usePropertyStore = create<PropertyState>()(
           status: 'draft',
           landUse: null,
           boundary: [],
-          syncStatus: 'local',
+          remoteStatus: 'local',
           createdAt: new Date().toISOString(),
         };
         set((state) => ({
@@ -94,7 +122,7 @@ export const usePropertyStore = create<PropertyState>()(
         };
 
         set((state) => ({
-          properties: state.properties.map((p) => (p.id === id ? { ...p, status: 'analysis', syncStatus: 'pending' } : p)),
+          properties: state.properties.map((p) => (p.id === id ? { ...p, status: 'analysis', remoteStatus: 'local' } : p)),
           outbox: queueOperation(state.outbox, {
             id: identifier(),
             propertyId: id,
@@ -112,26 +140,14 @@ export const usePropertyStore = create<PropertyState>()(
           if (!property) return state;
           
           const boundary = [...property.boundary, point];
-          const updatedProperty = { ...property, boundary, areaHa: areaHectares(boundary), syncStatus: 'pending' as SyncStatus };
+          // If we don't have a local boundaryId yet, generate one
+          const boundaryId = property.boundaryId || identifier();
           
-          const boundaryId = identifier(); // Local UUID for boundary version
-          const payload: ApiBoundaryCreate = {
-            boundary_id: boundaryId,
-            points: boundary
-          };
+          const updatedProperty = { ...property, boundary, areaHa: areaHectares(boundary), boundaryId };
           
           return {
             properties: state.properties.map((p) => (p.id === propertyId ? updatedProperty : p)),
-            outbox: queueOperation(state.outbox, {
-              id: identifier(),
-              propertyId,
-              boundaryId, // Keep track of which local boundary version we're updating
-              kind: 'update_boundary',
-              payload,
-              createdAt: new Date().toISOString(),
-              attempt: 0,
-              status: 'pending',
-            }),
+            outbox: queueOrUpdateBoundaryOperation(state.outbox, propertyId, boundaryId, boundary),
           };
         });
       },
@@ -141,38 +157,24 @@ export const usePropertyStore = create<PropertyState>()(
           if (!property) return state;
           
           const boundary = property.boundary.slice(0, -1);
-          const updatedProperty = { ...property, boundary, areaHa: areaHectares(boundary), syncStatus: 'pending' as SyncStatus };
-          
-          const boundaryId = identifier();
-          const payload: ApiBoundaryCreate = {
-            boundary_id: boundaryId,
-            points: boundary
-          };
+          const boundaryId = property.boundaryId || identifier();
+          const updatedProperty = { ...property, boundary, areaHa: areaHectares(boundary), boundaryId };
 
           return {
             properties: state.properties.map((p) => (p.id === propertyId ? updatedProperty : p)),
-            outbox: queueOperation(state.outbox, {
-              id: identifier(),
-              propertyId,
-              boundaryId,
-              kind: 'update_boundary',
-              payload,
-              createdAt: new Date().toISOString(),
-              attempt: 0,
-              status: 'pending',
-            }),
+            outbox: queueOrUpdateBoundaryOperation(state.outbox, propertyId, boundaryId, boundary),
           };
         });
       },
       confirmBoundary: (propertyId) => {
         set((state) => {
           const property = state.properties.find((p) => p.id === propertyId);
-          if (!property || !property.boundaryId) return state; // Ensure boundaryId exists before confirming
+          if (!property || !property.boundaryId) return state; 
 
           return {
             properties: state.properties.map((p) =>
               p.id === propertyId
-                ? { ...p, status: 'analysis', syncStatus: 'pending' as SyncStatus }
+                ? { ...p, status: 'analysis', boundaryId: undefined } // Clear boundaryId so next edit starts a new version
                 : p,
             ),
             passports: {
@@ -203,10 +205,10 @@ export const usePropertyStore = create<PropertyState>()(
         set((state) => ({
           outbox: state.outbox.filter((op) => op.id !== operationId),
         })),
-      updateSyncStatus: (propertyId, syncStatus) =>
+      updateRemoteStatus: (propertyId, remoteStatus) =>
         set((state) => ({
           properties: state.properties.map((p) =>
-            p.id === propertyId ? { ...p, syncStatus } : p
+            p.id === propertyId ? { ...p, remoteStatus } : p
           ),
         })),
       setBoundaryId: (propertyId, boundaryId) =>
@@ -221,10 +223,10 @@ export const usePropertyStore = create<PropertyState>()(
             op.id === operationId ? { ...op, attempt: op.attempt + 1 } : op
           ),
         })),
-      markOperationFailed: (operationId, error) =>
+      updateOperationStatus: (operationId, status, error) =>
         set((state) => ({
           outbox: state.outbox.map((op) => 
-            op.id === operationId ? { ...op, status: 'failed', lastError: error } : op
+            op.id === operationId ? { ...op, status, lastError: error } : op
           ),
         })),
     }),

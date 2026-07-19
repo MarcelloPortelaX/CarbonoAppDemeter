@@ -7,7 +7,12 @@ import {
   ApiPropertyReadSchema,
   ApiPropertyRead,
   ApiBoundaryVersionReadSchema,
-  ApiBoundaryVersionRead
+  ApiBoundaryVersionRead,
+  ApiBoundaryConfirmationReadSchema,
+  ApiBoundaryConfirmationRead,
+  ApiAssessmentCreate,
+  ApiPassportReadSchema,
+  ApiPassportRead
 } from '../domain/models';
 
 export class ApiError extends Error {
@@ -59,8 +64,7 @@ export async function updateBoundary(propertyId: string, payload: ApiBoundaryCre
   return ApiBoundaryVersionReadSchema.parse(data);
 }
 
-export async function confirmBoundary(propertyId: string, boundaryId: string): Promise<void> {
-  // Confirming specific version, per user instruction (Part 7).
+export async function confirmBoundary(propertyId: string, boundaryId: string): Promise<ApiBoundaryConfirmationRead> {
   const response = await fetch(`${API_URL}/properties/${propertyId}/boundaries/${boundaryId}/confirm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -69,6 +73,8 @@ export async function confirmBoundary(propertyId: string, boundaryId: string): P
     const text = await response.text();
     throw new ApiError(`Failed to confirm boundary`, response.status, text);
   }
+  const data = await response.json();
+  return ApiBoundaryConfirmationReadSchema.parse(data);
 }
 
 export async function listProperties(): Promise<ApiPropertyRead[]> {
@@ -78,9 +84,21 @@ export async function listProperties(): Promise<ApiPropertyRead[]> {
   return z.array(ApiPropertyReadSchema).parse(data);
 }
 
-export async function getPassport(propertyId: string): Promise<Passport> {
-  // Separate submitAssessment and getPassport per user instruction (Part 8).
+export async function submitAssessment(propertyId: string, payload: ApiAssessmentCreate): Promise<void> {
+  const response = await fetch(`${API_URL}/assessments/properties/${propertyId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new ApiError(`Failed to submit assessment`, response.status, text);
+  }
+}
+
+export async function getPassport(propertyId: string): Promise<ApiPassportRead> {
   const response = await fetch(`${API_URL}/passports/properties/${propertyId}`, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new ApiError(`Failed to get passport`, response.status);
-  return await response.json(); // Need to validate with a Zod schema later, assuming Passport matches backend directly for now
+  const data = await response.json();
+  return ApiPassportReadSchema.parse(data);
 }

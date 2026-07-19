@@ -31,7 +31,7 @@ export default function Home() {
 
   const startProperty = () => {
     const id = createProperty();
-    router.push({ pathname: '/property/[id]/map', params: { id } });
+    router.push({ pathname: '/property/[id]/edit', params: { id } });
   };
 
   return (
@@ -43,7 +43,7 @@ export default function Home() {
         <SectionHeader title="Minhas áreas" onSearch={() => setSearchVisible((value) => !value)} onFilter={() => setFilterPending((value) => !value)} filterActive={filterPending} />
         {searchVisible && <TextInput accessibilityLabel="Buscar por nome ou município" autoFocus value={query} onChangeText={setQuery} placeholder="Buscar por nome ou município" placeholderTextColor={theme.colors.textMuted} style={[styles.search, { color: theme.colors.text, backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]} />}
         <NeonButton label="Nova área" onPress={startProperty} />
-        {!hydrated ? <ActivityIndicator size="large" color={theme.brand.neon} style={styles.loader} /> : visibleProperties.length === 0 ? <EmptyState title="Nenhuma área encontrada" message="Ajuste a busca ou cadastre uma nova área para iniciar a triagem." /> : <View style={styles.list}>{visibleProperties.map((property, index) => <PropertyCard key={property.id} property={property} index={index} onPress={() => router.push({ pathname: passports[property.id] ? '/passport/[id]' : '/property/[id]/map', params: { id: property.id } })} />)}</View>}
+        {!hydrated ? <ActivityIndicator size="large" color={theme.brand.neon} style={styles.loader} /> : visibleProperties.length === 0 ? <EmptyState title="Nenhuma área encontrada" message="Ajuste a busca ou cadastre uma nova área para iniciar a triagem." /> : <View style={styles.list}>{visibleProperties.map((property, index) => <PropertyCard key={property.id} property={property} index={index} onPress={() => router.push({ pathname: property.status === 'draft' ? '/property/[id]/edit' : (passports[property.id] ? '/passport/[id]' : '/property/[id]/map'), params: { id: property.id } })} />)}</View>}
       </ScrollView>
     </Screen>
   );
