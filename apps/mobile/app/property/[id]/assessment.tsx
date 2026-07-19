@@ -8,6 +8,8 @@ import { useDemeterTheme } from '../../../src/theme/ThemeProvider';
 import { submitAssessment } from '../../../src/services/api';
 import { usePropertyStore } from '../../../src/state/propertyStore';
 
+type ThemeType = ReturnType<typeof useDemeterTheme>['theme'];
+
 export default function AssessmentForm() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useDemeterTheme();
@@ -93,7 +95,17 @@ export default function AssessmentForm() {
   );
 }
 
-function OptionButton({ label, selected, onPress, theme }: any) {
+function OptionButton({
+  label,
+  selected,
+  onPress,
+  theme,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  theme: ThemeType;
+}) {
   return (
     <Pressable
       style={[

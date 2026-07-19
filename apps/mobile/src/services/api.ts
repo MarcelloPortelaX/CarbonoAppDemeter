@@ -1,7 +1,6 @@
 import Constants from 'expo-constants';
 import { z } from 'zod';
 import { 
-  Passport, 
   ApiPropertyCreate, 
   ApiBoundaryCreate,
   ApiPropertyReadSchema,

@@ -1,7 +1,6 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import HTTPException
-from geoalchemy2.elements import WKTElement
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.provenance import canonical_hash
 from app.domain.schemas import (
     AssessmentRead,
+    BoundaryConfirmationRead,
     BoundaryCreate,
     BoundaryVersionRead,
-    BoundaryConfirmationRead,
     LandUse,
     PropertyCreate,
     PropertyRead,
@@ -75,8 +74,8 @@ class PostgresRepository:
         ]
 
     async def save_boundary(self, property_id: UUID, boundary_request: BoundaryCreate) -> BoundaryVersionRead:
-        from shapely.geometry import Polygon, MultiPolygon
-        from shapely.validation import make_valid
+        from shapely.geometry import MultiPolygon, Polygon  # type: ignore
+        from shapely.validation import make_valid  # type: ignore
         
         if not boundary_request.boundary_id:
             raise HTTPException(status_code=422, detail="boundary_id is required for idempotency")
@@ -142,38 +141,47 @@ class PostgresRepository:
         new_version = (latest_boundary.version + 1) if latest_boundary else 1
 
         ewkt = f"SRID=4326;{wkt_str}"
-        geom = WKTElement(ewkt, srid=4326)
 
-        new_boundary = BoundaryVersionModel(
+        # Use text() to insert geometry explicitly instead of ORM add() to avoid parsing issues
+        from sqlalchemy import text
+        insert_stmt = text("""
+            INSERT INTO boundary_versions (id, property_id, version, geometry, area_ha, perimeter_km, input_hash, is_confirmed, created_at)
+            VALUES (:id, :property_id, :version, ST_GeomFromEWKT(:ewkt), 0.0, 0.0, :input_hash, false, NOW())
+            RETURNING created_at
+        """)
+        
+        result = await self.session.execute(insert_stmt, {
+            "id": boundary_id,
+            "property_id": property_id,
+            "version": new_version,
+            "ewkt": ewkt,
+            "input_hash": input_hash
+        })
+        created_at = result.scalar()
+        
+        update_stmt = text("""
+            UPDATE boundary_versions 
+            SET area_ha = ST_Area(geometry::geography) / 10000, 
+                perimeter_km = ST_Perimeter(geometry::geography) / 1000 
+            WHERE id = :id
+            RETURNING area_ha, perimeter_km
+        """)
+        
+        result = await self.session.execute(update_stmt, {"id": boundary_id})
+        row = result.fetchone()
+        new_area = row[0] if row else 0.0
+        new_perimeter = row[1] if row else 0.0
+        
+        await self.session.commit()
+        
+        return BoundaryVersionRead(
             id=boundary_id,
             property_id=property_id,
             version=new_version,
-            geometry=geom,
-            area_ha=0.0,
-            perimeter_km=0.0,
+            area_ha=new_area,
+            perimeter_km=new_perimeter,
             input_hash=input_hash,
-            is_confirmed=False
-        )
-        
-        self.session.add(new_boundary)
-        await self.session.commit()
-        await self.session.refresh(new_boundary)
-        
-        await self.session.execute(
-            func.text("UPDATE boundary_versions SET area_ha = ST_Area(geometry::geography) / 10000, perimeter_km = ST_Perimeter(geometry::geography) / 1000 WHERE id = :id")
-            .bindparams(id=new_boundary.id)
-        )
-        await self.session.commit()
-        await self.session.refresh(new_boundary)
-        
-        return BoundaryVersionRead(
-            id=new_boundary.id,
-            property_id=new_boundary.property_id,
-            version=new_boundary.version,
-            area_ha=new_boundary.area_ha,
-            perimeter_km=new_boundary.perimeter_km,
-            input_hash=new_boundary.input_hash,
-            created_at=new_boundary.created_at
+            created_at=created_at  # type: ignore
         )
 
     async def confirm_boundary(self, property_id: UUID, boundary_id: UUID) -> BoundaryConfirmationRead:

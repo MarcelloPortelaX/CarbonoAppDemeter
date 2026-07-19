@@ -1,10 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, ScrollView, Alert } from 'react-native';
 import { NeonButton } from '../../../src/components/NeonButton';
 import { Screen } from '../../../src/components/Screen';
-import { usePropertyStore, isPropertyReadyForSync } from '../../../src/state/propertyStore';
+import { usePropertyStore } from '../../../src/state/propertyStore';
 import { useDemeterTheme } from '../../../src/theme/ThemeProvider';
 import { LandUse } from '../../../src/domain/models';
 
@@ -42,9 +42,12 @@ export default function PropertyEdit() {
   const isValid = name.trim().length > 0 && municipality.trim().length > 0 && stateUF.trim().length > 0 && landUse !== null;
 
   const handleSave = () => {
-    if (!isValid) return;
+    if (!name.trim() || !municipality.trim() || !stateUF.trim() || !landUse) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+      return;
+    }
 
-    updatePropertyDraft(property.id, {
+    updatePropertyDraft(id as string, { 
       name: name.trim(),
       municipality: municipality.trim(),
       state: stateUF.trim().toUpperCase(),
@@ -52,8 +55,8 @@ export default function PropertyEdit() {
     });
     
     // Only submit for sync if it's currently a local draft
-    if (property.syncStatus === 'local') {
-      submitPropertyForSync(property.id);
+    if (property?.remoteStatus === 'local') {
+      submitPropertyForSync(id as string);
     }
     
     router.replace({ pathname: '/property/[id]/map', params: { id: property.id } });

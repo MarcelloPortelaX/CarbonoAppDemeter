@@ -9,6 +9,8 @@ python -m pytest
 if errorlevel 1 exit /b 1
 ruff check .
 if errorlevel 1 exit /b 1
+python -m mypy app
+if errorlevel 1 exit /b 1
 cd ..\..
 
 echo [MOBILE] Sintaxe, tipos, lint e testes

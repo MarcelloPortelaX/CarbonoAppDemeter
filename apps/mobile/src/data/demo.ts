@@ -3,7 +3,7 @@ import { Passport, PropertySummary } from '../domain/models';
 export const properties: PropertySummary[] = [
   {
     id: 'boa-esperanca', name: 'Fazenda Boa Esperança', municipality: 'São Gabriel do Oeste', state: 'MS',
-    areaHa: 420.35, status: 'analysis', landUse: 'degraded_pasture', syncStatus: 'synced',
+    areaHa: 420.35, status: 'analysis', landUse: 'degraded_pasture', remoteStatus: 'created',
     createdAt: '2026-07-01T09:00:00.000Z', demo: true,
     boundary: [
       { latitude: -19.4200, longitude: -54.5700 }, { latitude: -19.4140, longitude: -54.5580 },
@@ -13,12 +13,12 @@ export const properties: PropertySummary[] = [
   },
   {
     id: 'verde-vivo', name: 'Sítio Verde Vivo', municipality: 'Corumbá', state: 'MS', areaHa: 180,
-    status: 'documentation', landUse: 'agroforestry', boundary: [], syncStatus: 'pending',
+    status: 'documentation', landUse: 'agroforestry', boundary: [], remoteStatus: 'local',
     createdAt: '2026-07-03T14:30:00.000Z', demo: true,
   },
   {
     id: 'santa-clara', name: 'Fazenda Santa Clara', municipality: 'Rio Verde', state: 'GO', areaHa: 310,
-    status: 'eligible', landUse: 'native_vegetation', boundary: [], syncStatus: 'synced',
+    status: 'eligible', landUse: 'native_vegetation', boundary: [], remoteStatus: 'created',
     createdAt: '2026-07-05T11:15:00.000Z', demo: true,
   },
 ];

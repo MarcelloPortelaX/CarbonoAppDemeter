@@ -1,9 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const globalRoot = cp.execSync('npm root -g').toString().trim();
-const ts = require(path.join(globalRoot, 'typescript/lib/typescript.js'));
 const root = path.resolve(__dirname, '../apps/mobile');
+const ts = require(path.join(root, 'node_modules/typescript/lib/typescript.js'));
 let failures = 0;
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

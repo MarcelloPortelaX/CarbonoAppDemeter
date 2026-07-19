@@ -9,7 +9,6 @@ import type {
   SyncOperation, 
   RemoteStatus,
   ApiPropertyCreate,
-  ApiBoundaryCreate
 } from '../domain/models';
 import { areaHectares } from '../utils/geo';
 import * as Crypto from 'expo-crypto';
@@ -21,32 +20,12 @@ export function isPropertyReadyForSync(property: PropertySummary): boolean {
   return true;
 }
 
-const queueOrUpdateBoundaryOperation = (
-  outbox: SyncOperation[],
-  propertyId: string,
-  boundaryId: string,
-  points: Coordinate[]
-) => {
-  // If there's already an un-synced update_boundary for this boundaryId, just update its payload
-  const existingIndex = outbox.findIndex(op => op.kind === 'update_boundary' && op.propertyId === propertyId && op.boundaryId === boundaryId);
-  if (existingIndex >= 0) {
-    const newOutbox = [...outbox];
-    const op = newOutbox[existingIndex] as UpdateBoundaryOperation;
-    newOutbox[existingIndex] = { ...op, payload: { boundary_id: boundaryId, points } };
-    return newOutbox;
-  }
-  
-  // Otherwise, queue a new one
-  return queueOperation(outbox, {
-    id: identifier(),
-    propertyId,
-    boundaryId,
-    kind: 'update_boundary',
-    payload: { boundary_id: boundaryId, points },
-    createdAt: new Date().toISOString(),
-    attempt: 0,
-    status: 'pending',
-  });
+const isBoundaryReadyForSync = (points: Coordinate[]): boolean => {
+  // Simple validation for MVP: must have at least 3 points and area > 0
+  if (points.length < 3) return false;
+  if (areaHectares(points) <= 0) return false;
+  // Checking self-intersection in JS is complex for MVP, so we assume backend does it or user drew correctly.
+  return true;
 };
 
 const queueOperation = (
@@ -147,7 +126,6 @@ export const usePropertyStore = create<PropertyState>()(
           
           return {
             properties: state.properties.map((p) => (p.id === propertyId ? updatedProperty : p)),
-            outbox: queueOrUpdateBoundaryOperation(state.outbox, propertyId, boundaryId, boundary),
           };
         });
       },
@@ -162,7 +140,6 @@ export const usePropertyStore = create<PropertyState>()(
 
           return {
             properties: state.properties.map((p) => (p.id === propertyId ? updatedProperty : p)),
-            outbox: queueOrUpdateBoundaryOperation(state.outbox, propertyId, boundaryId, boundary),
           };
         });
       },
@@ -189,15 +166,29 @@ export const usePropertyStore = create<PropertyState>()(
                   'Quantificação ainda não habilitada. Esta triagem não representa emissão de créditos.',
               },
             },
-            outbox: queueOperation(state.outbox, {
-              id: identifier(),
-              propertyId,
-              boundaryId: property.boundaryId,
-              kind: 'confirm_boundary',
-              createdAt: new Date().toISOString(),
-              attempt: 0,
-              status: 'pending',
-            }),
+            outbox: isBoundaryReadyForSync(property.boundary) 
+              ? queueOperation(
+                  queueOperation(state.outbox, {
+                    id: identifier(),
+                    propertyId,
+                    boundaryId: property.boundaryId,
+                    kind: 'update_boundary',
+                    payload: { boundary_id: property.boundaryId, points: property.boundary },
+                    createdAt: new Date().toISOString(),
+                    attempt: 0,
+                    status: 'pending',
+                  }),
+                  {
+                    id: identifier(),
+                    propertyId,
+                    boundaryId: property.boundaryId,
+                    kind: 'confirm_boundary',
+                    createdAt: new Date().toISOString(),
+                    attempt: 0,
+                    status: 'pending',
+                  }
+                )
+              : state.outbox,
           };
         });
       },
@@ -239,6 +230,23 @@ export const usePropertyStore = create<PropertyState>()(
         passports: state.passports,
         outbox: state.outbox,
       }),
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as PropertyState;
+        if (version < 3) {
+          // Convert syncStatus to remoteStatus
+          state.properties = state.properties?.map((p: PropertySummary & { syncStatus?: string }) => {
+            const remoteStatus = p.syncStatus === 'synced' ? 'created' : (p.syncStatus === 'error' ? 'error' : 'local');
+            delete p.syncStatus;
+            return { ...p, remoteStatus } as PropertySummary;
+          });
+          // For operations, mark unknown ones as failed, though they should be compatible
+          state.outbox = state.outbox?.map((op: SyncOperation & { status?: string }) => ({
+            ...op,
+            status: op.status === 'failed' ? 'failed' : op.status || 'pending'
+          })) as SyncOperation[];
+        }
+        return state;
+      },
       onRehydrateStorage: () => (state) => state?.setHydrated(true),
     },
   ),

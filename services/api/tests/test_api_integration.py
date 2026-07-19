@@ -1,4 +1,5 @@
 import os
+import socket
 from uuid import uuid4
 
 import pytest
@@ -9,10 +10,19 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.api.deps import get_db
 from app.main import app
 
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://demeter:demeter@localhost:5432/demeter_carbono")
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://demeter:demeter@localhost:5432/demeter_carbono_test")
 
 engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestingSessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def is_db_running():
+    try:
+        with socket.create_connection(("localhost", 5432), timeout=1):
+            return True
+    except OSError:
+        return False
+
+pytestmark = pytest.mark.skipif(not is_db_running(), reason="PostgreSQL not running locally")
 
 async def override_get_db():
     async with TestingSessionLocal() as session:

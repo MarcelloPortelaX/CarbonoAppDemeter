@@ -42,8 +42,8 @@ export default function Passport() {
           const mapped: PassportModel = {
             propertyId: data.property_id,
             status: statusMap[data.eligibility] || 'analysis',
-            resultState: data.stage === 'screening' ? 'blocked' : 'demo',
-            demoPotentialTco2e: data.scenario.potential_tco2e_per_year ?? undefined,
+            resultState: data.scenario.maturity === 'screening' ? 'blocked' : 'demo',
+            demoPotentialTco2e: data.scenario.value_tco2e ?? undefined,
             horizonYears: data.scenario.horizon_years ?? undefined,
             pendingCount: data.pending.length,
             currentStep: (stageMap[data.stage] || 0) as 0|1|2|3|4,

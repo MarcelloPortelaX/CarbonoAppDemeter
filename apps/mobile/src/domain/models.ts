@@ -53,15 +53,28 @@ export type ApiAssessmentCreate = z.infer<typeof ApiAssessmentCreateSchema>;
 export const ApiPassportReadSchema = z.object({
   id: z.string().uuid(),
   property_id: z.string().uuid(),
-  eligibility: z.string(),
-  stage: z.string(),
+  eligibility: z.enum(['potential', 'needs_review', 'not_ready']),
+  stage: z.enum(['area', 'eligibility', 'documentation', 'analysis', 'emission']),
   pending: z.array(z.string()),
-  integrity: z.number(),
+  integrity: z.object({
+    gates: z.array(
+      z.object({
+        key: z.string(),
+        status: z.enum(['not_started', 'in_review', 'passed', 'failed', 'external_required']),
+        evidence_ids: z.array(z.string()),
+        rationale: z.string().nullable(),
+      })
+    ),
+  }),
   scenario: z.object({
-    description: z.string(),
-    disclaimer: z.string(),
-    potential_tco2e_per_year: z.number().nullable(),
+    maturity: z.enum(['screening', 'scenario', 'estimate', 'verified', 'issued']),
+    label: z.string(),
+    value_tco2e: z.number().nullable(),
+    lower_tco2e: z.number().nullable(),
+    upper_tco2e: z.number().nullable(),
     horizon_years: z.number().nullable(),
+    disclaimer: z.string(),
+    provenance: z.any().nullable(),
   }),
   created_at: z.string(),
   updated_at: z.string(),
