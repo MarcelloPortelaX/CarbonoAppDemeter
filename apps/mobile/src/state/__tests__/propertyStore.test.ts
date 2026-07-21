@@ -72,6 +72,24 @@ describe('propertyStore persistence', () => {
     expect(state.hydrated).toBe(true); // Should still become hydrated
   });
 
+  it('persists the last map viewport without creating a sync operation', () => {
+    const propertyId = usePropertyStore.getState().properties[0]!.id;
+    const viewport = {
+      latitude: -21.2264,
+      longitude: -44.9787,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+
+    usePropertyStore.getState().updateMapViewport(propertyId, viewport);
+
+    const state = usePropertyStore.getState();
+    expect(state.properties.find((property) => property.id === propertyId)?.mapViewport).toEqual(
+      viewport,
+    );
+    expect(state.outbox).toHaveLength(0);
+  });
+
   it('handles partially corrupted state gracefully during migration', async () => {
     const AsyncStorage = require('@react-native-async-storage/async-storage');
     

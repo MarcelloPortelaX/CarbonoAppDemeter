@@ -26,9 +26,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: google_auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: demeter-carbono-app-202607
+          workload_identity_provider: projects/356486903021/locations/global/workloadIdentityPools/github-actions-pool/providers/github
+
+      - name: Load Google Maps build key
+        id: maps_secret
+        uses: google-github-actions/get-secretmanager-secrets@v3
+        with:
+          secrets: |-
+            google_maps_api_key:demeter-carbono-app-202607/google-maps-api-key
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -56,7 +71,7 @@ jobs:
         working-directory: apps/mobile
         env:
           APP_ENV: preview
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ steps.maps_secret.outputs.google_maps_api_key }}
         run: |
           mkdir -p dist
           if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
@@ -132,7 +147,28 @@ jobs:
             exit 1
           fi
           
-          sha256sum "$APK" > dist/demeter-carbono.apk.sha256
+          CERT_SHA1=$("$APKSIGNER" verify --print-certs "$APK" | sed -n -E 's/^(Signer #1|V[0-9]+ Signer): certificate SHA-1 digest: //p' | head -n 1)
+          APK_SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
+          APP_VERSION=$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" dist/apk-metadata.txt | head -n 1)
+          APP_BUILD_NUMBER=$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" dist/apk-metadata.txt | head -n 1)
+
+          test -n "$CERT_SHA1"
+          test -n "$APK_SHA256"
+          test -n "$APP_VERSION"
+          test -n "$APP_BUILD_NUMBER"
+
+          printf '%s  %s\n' "$APK_SHA256" "demeter-carbono.apk" > dist/demeter-carbono.apk.sha256
+          jq -n \
+            --arg git_sha "$GITHUB_SHA" \
+            --arg version "$APP_VERSION" \
+            --arg build_number "$APP_BUILD_NUMBER" \
+            --arg environment "preview" \
+            --arg package_name "com.demeter.carbono" \
+            --arg signing_certificate_sha1 "$CERT_SHA1" \
+            --arg apk_sha256 "$APK_SHA256" \
+            --arg workflow_run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{git_sha: $git_sha, version: $version, build_number: $build_number, environment: $environment, package_name: $package_name, signing_certificate_sha1: $signing_certificate_sha1, apk_sha256: $apk_sha256, workflow_run_url: $workflow_run_url}' \
+            > dist/release-provenance.json
           echo "APK validated successfully"
 
       - name: Upload APK Metadata
@@ -143,6 +179,7 @@ jobs:
           path: |
             apps/mobile/dist/demeter-carbono.apk.sha256
             apps/mobile/dist/apk-metadata.txt
+            apps/mobile/dist/release-provenance.json
           if-no-files-found: ignore
 
   android_smoke_test:
@@ -224,6 +261,7 @@ jobs:
             apps/mobile/dist/demeter-carbono.apk
             apps/mobile/dist/demeter-carbono.apk.sha256
             apps/mobile/dist/apk-metadata.txt
+            apps/mobile/dist/release-provenance.json
           draft: false
           generate_release_notes: true
 

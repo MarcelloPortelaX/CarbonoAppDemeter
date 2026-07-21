@@ -10,6 +10,7 @@ import MapView, {
   Marker,
   Polygon,
   PROVIDER_GOOGLE,
+  Region,
 } from 'react-native-maps';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { NeonButton } from '../../../src/components/NeonButton';
@@ -37,6 +38,7 @@ export default function PropertyMap() {
   const addBoundaryPoint = usePropertyStore((state) => state.addBoundaryPoint);
   const undoBoundaryPoint = usePropertyStore((state) => state.undoBoundaryPoint);
   const confirmBoundary = usePropertyStore((state) => state.confirmBoundary);
+  const updateMapViewport = usePropertyStore((state) => state.updateMapViewport);
   const nativeMapsConfigured = Constants.expoConfig?.extra?.mapsConfigured === true;
   const canAttemptMap = nativeMapsConfigured || __DEV__;
   const [mapType, setMapType] = useState<MapType>('hybrid');
@@ -50,9 +52,10 @@ export default function PropertyMap() {
   const perimeter = boundary.length ? perimeterMeters(boundary) / 1_000 : 0;
   const selfIntersecting = hasSelfIntersection(boundary);
   const canConfirm = boundary.length >= 3 && !selfIntersecting;
-  const initialRegion = boundary[0]
-    ? { ...boundary[0], latitudeDelta: 0.035, longitudeDelta: 0.035 }
-    : DEFAULT_REGION;
+  const initialRegion = property?.mapViewport ??
+    (boundary[0]
+      ? { ...boundary[0], latitudeDelta: 0.035, longitudeDelta: 0.035 }
+      : DEFAULT_REGION);
 
   useEffect(() => {
     if (mapStatus !== 'loading') return undefined;
@@ -67,6 +70,28 @@ export default function PropertyMap() {
   const handleMapPress = (event: MapPressEvent) => {
     if (property) {
       addBoundaryPoint(property.id, event.nativeEvent.coordinate);
+    }
+  };
+
+  const handleRegionChangeComplete = (region: Region) => {
+    if (property) {
+      updateMapViewport(property.id, region);
+    }
+  };
+
+  const fitBoundary = (animated = true) => {
+    if (boundary.length < 2) return;
+
+    mapRef.current?.fitToCoordinates(boundary, {
+      edgePadding: { top: 120, right: 80, bottom: 320, left: 80 },
+      animated,
+    });
+  };
+
+  const handleMapLoaded = () => {
+    setMapStatus('ready');
+    if (!property?.mapViewport && boundary.length >= 2) {
+      requestAnimationFrame(() => fitBoundary(false));
     }
   };
 
@@ -174,8 +199,9 @@ export default function PropertyMap() {
           customMapStyle={theme.mode === 'dark' ? darkMapStyle : []}
           initialRegion={initialRegion}
           loadingEnabled
-          onMapLoaded={() => setMapStatus('ready')}
+          onMapLoaded={handleMapLoaded}
           onPress={handleMapPress}
+          onRegionChangeComplete={handleRegionChangeComplete}
           accessibilityLabel="Mapa para delimitar a propriedade"
         >
           {boundary.length >= 2 && (
@@ -249,6 +275,12 @@ export default function PropertyMap() {
             label="Desfazer último vértice"
             disabled={!boundary.length}
             onPress={() => undoBoundaryPoint(property.id)}
+          />
+          <MapControl
+            icon="fit-to-page-outline"
+            label="Enquadrar perímetro"
+            disabled={boundary.length < 2}
+            onPress={() => fitBoundary()}
           />
         </View>
 

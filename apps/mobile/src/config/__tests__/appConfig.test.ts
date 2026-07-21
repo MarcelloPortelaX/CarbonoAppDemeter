@@ -15,6 +15,8 @@ describe('Expo Maps configuration', () => {
     delete process.env.EXPO_PUBLIC_APP_ENV;
     delete process.env.EAS_BUILD_PROFILE;
     delete process.env.GOOGLE_MAPS_API_KEY;
+    delete process.env.GITHUB_SHA;
+    delete process.env.GITHUB_RUN_NUMBER;
   });
 
   afterAll(() => {
@@ -37,6 +39,8 @@ describe('Expo Maps configuration', () => {
   it('passes the build key only to the native Maps plugin', () => {
     process.env.APP_ENV = 'preview';
     process.env.GOOGLE_MAPS_API_KEY = 'test-build-key';
+    process.env.GITHUB_SHA = 'dc3786d123456789';
+    process.env.GITHUB_RUN_NUMBER = '42';
 
     const config = createExpoConfig(baseConfig);
     const mapsPlugin = config.plugins?.find(
@@ -49,5 +53,10 @@ describe('Expo Maps configuration', () => {
     ]);
     expect(config.extra).not.toHaveProperty('googleMapsApiKey');
     expect(config.extra?.mapsConfigured).toBe(true);
+    expect(config.extra?.releaseProvenance).toEqual({
+      gitCommitSha: 'dc3786d123456789',
+      buildNumber: '42',
+      buildProfile: 'preview',
+    });
   });
 });

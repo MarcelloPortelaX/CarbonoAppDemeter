@@ -16,6 +16,10 @@ export function createExpoConfig(baseConfig: Partial<ExpoConfig>): ExpoConfig {
   const environment = resolveEnvironment();
   const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
   const isNativeReleaseBuild = Boolean(process.env.EAS_BUILD_PROFILE) || environment !== 'development';
+  const gitCommitSha =
+    process.env.GITHUB_SHA ?? process.env.EAS_BUILD_GIT_COMMIT_HASH ?? 'local';
+  const buildNumber = process.env.GITHUB_RUN_NUMBER ?? process.env.BUILD_NUMBER ?? 'local';
+  const buildProfile = process.env.EAS_BUILD_PROFILE ?? environment;
 
   if (isNativeReleaseBuild && !mapsApiKey) {
     throw new Error(
@@ -42,6 +46,7 @@ export function createExpoConfig(baseConfig: Partial<ExpoConfig>): ExpoConfig {
     android: {
       ...baseConfig.android,
       package: 'com.demeter.carbono',
+      versionCode: 2,
       adaptiveIcon: {
         foregroundImage: './assets/brand-symbol.png',
         backgroundColor: '#020A07',
@@ -89,6 +94,11 @@ export function createExpoConfig(baseConfig: Partial<ExpoConfig>): ExpoConfig {
       ...baseConfig.extra,
       appEnvironment: environment,
       mapsConfigured: Boolean(mapsApiKey),
+      releaseProvenance: {
+        gitCommitSha,
+        buildNumber,
+        buildProfile,
+      },
       eas: {
         projectId: '687b4ec3-9a18-40fc-b7f9-b12babbe1d71',
       },

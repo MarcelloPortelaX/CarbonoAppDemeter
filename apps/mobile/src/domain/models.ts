@@ -6,6 +6,11 @@ export type RemoteStatus = 'local' | 'created' | 'error';
 
 export type Coordinate = { latitude: number; longitude: number };
 
+export type MapViewport = Coordinate & {
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
 export const LandUseSchema = z.enum([
   'degraded_pasture',
   'agriculture',
@@ -124,6 +129,7 @@ export type PropertySummary = {
   status: PropertyStatus;
   landUse: LandUse | null;
   boundary: Coordinate[];
+  mapViewport?: MapViewport;
   boundaryId?: string; // Stable UUID for boundary version
   remoteStatus: RemoteStatus;
   createdAt: string;

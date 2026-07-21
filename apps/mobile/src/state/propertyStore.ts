@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { passports as demoPassports, properties as demoProperties } from '../data/demo';
 import type { 
   Coordinate, 
+  MapViewport,
   Passport, 
   PropertySummary, 
   SyncOperation, 
@@ -47,6 +48,7 @@ type PropertyState = {
   submitPropertyForSync: (id: string) => void;
   addBoundaryPoint: (propertyId: string, point: Coordinate) => void;
   undoBoundaryPoint: (propertyId: string) => void;
+  updateMapViewport: (propertyId: string, viewport: MapViewport) => void;
   confirmBoundary: (propertyId: string) => void;
   removeOperation: (operationId: string) => void;
   updateRemoteStatus: (propertyId: string, status: RemoteStatus) => void;
@@ -144,6 +146,12 @@ export const usePropertyStore = create<PropertyState>()(
           };
         });
       },
+      updateMapViewport: (propertyId, mapViewport) =>
+        set((state) => ({
+          properties: state.properties.map((property) =>
+            property.id === propertyId ? { ...property, mapViewport } : property,
+          ),
+        })),
       confirmBoundary: (propertyId) => {
         set((state) => {
           const property = state.properties.find((p) => p.id === propertyId);

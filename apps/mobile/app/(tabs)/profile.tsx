@@ -19,6 +19,10 @@ export default function Profile() {
   const pending = usePropertyStore((state) => state.outbox.length);
   const properties = usePropertyStore((state) => state.properties.length);
   const version = Constants.expoConfig?.version ?? '0.2.0';
+  const provenance = Constants.expoConfig?.extra?.releaseProvenance as
+    | { gitCommitSha?: string; buildNumber?: string; buildProfile?: string }
+    | undefined;
+  const shortCommit = provenance?.gitCommitSha?.slice(0, 7) ?? 'local';
 
   return (
     <Screen>
@@ -75,7 +79,8 @@ export default function Profile() {
           <Text style={[styles.body, { color: theme.colors.textMuted }]}>Este MVP organiza áreas, triagem e evidências. Não emite, certifica nem garante créditos de carbono. Valores marcados como DEMO são apenas cenários demonstrativos.</Text>
         </SurfaceCard>
 
-        <Text style={[styles.version, { color: theme.colors.textMuted }]}>Versão {version} · ambiente {__DEV__ ? 'desenvolvimento' : 'produção'}</Text>
+        <Text style={[styles.version, { color: theme.colors.textMuted }]}>Versão {version} · build {provenance?.buildNumber ?? 'local'}</Text>
+        <Text style={[styles.version, { color: theme.colors.textMuted }]}>Commit {shortCommit} · ambiente {provenance?.buildProfile ?? (__DEV__ ? 'development' : 'production')}</Text>
       </ScrollView>
     </Screen>
   );
