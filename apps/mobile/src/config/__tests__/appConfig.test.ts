@@ -8,13 +8,12 @@ const baseConfig: ExpoConfig = {
 
 const originalEnvironment = process.env;
 
-describe('Expo Maps configuration', () => {
+describe('Expo map configuration', () => {
   beforeEach(() => {
     process.env = { ...originalEnvironment };
     delete process.env.APP_ENV;
     delete process.env.EXPO_PUBLIC_APP_ENV;
     delete process.env.EAS_BUILD_PROFILE;
-    delete process.env.GOOGLE_MAPS_API_KEY;
     delete process.env.GITHUB_SHA;
     delete process.env.GITHUB_RUN_NUMBER;
   });
@@ -23,36 +22,27 @@ describe('Expo Maps configuration', () => {
     process.env = originalEnvironment;
   });
 
-  it('allows local development without embedding a Maps key', () => {
+  it('uses MapLibre without requiring an API key', () => {
     const config = createExpoConfig(baseConfig);
 
     expect(config.extra?.appEnvironment).toBe('development');
-    expect(config.extra?.mapsConfigured).toBe(false);
+    expect(config.extra?.mapProvider).toBe('maplibre-openfreemap');
+    expect(config.plugins).toContain('@maplibre/maplibre-react-native');
   });
 
-  it('rejects preview builds without a Maps key', () => {
+  it('allows preview builds without a Maps key', () => {
     process.env.APP_ENV = 'preview';
 
-    expect(() => createExpoConfig(baseConfig)).toThrow('GOOGLE_MAPS_API_KEY');
+    expect(() => createExpoConfig(baseConfig)).not.toThrow();
   });
 
-  it('passes the build key only to the native Maps plugin', () => {
+  it('keeps release provenance without exposing key configuration', () => {
     process.env.APP_ENV = 'preview';
-    process.env.GOOGLE_MAPS_API_KEY = 'test-build-key';
     process.env.GITHUB_SHA = 'dc3786d123456789';
     process.env.GITHUB_RUN_NUMBER = '42';
 
     const config = createExpoConfig(baseConfig);
-    const mapsPlugin = config.plugins?.find(
-      (plugin) => Array.isArray(plugin) && plugin[0] === 'react-native-maps',
-    );
-
-    expect(mapsPlugin).toEqual([
-      'react-native-maps',
-      { androidGoogleMapsApiKey: 'test-build-key' },
-    ]);
     expect(config.extra).not.toHaveProperty('googleMapsApiKey');
-    expect(config.extra?.mapsConfigured).toBe(true);
     expect(config.extra?.releaseProvenance).toEqual({
       gitCommitSha: 'dc3786d123456789',
       buildNumber: '42',

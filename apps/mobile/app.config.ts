@@ -14,18 +14,10 @@ function resolveEnvironment(): AppEnvironment {
 
 export function createExpoConfig(baseConfig: Partial<ExpoConfig>): ExpoConfig {
   const environment = resolveEnvironment();
-  const mapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
-  const isNativeReleaseBuild = Boolean(process.env.EAS_BUILD_PROFILE) || environment !== 'development';
   const gitCommitSha =
     process.env.GITHUB_SHA ?? process.env.EAS_BUILD_GIT_COMMIT_HASH ?? 'local';
   const buildNumber = process.env.GITHUB_RUN_NUMBER ?? process.env.BUILD_NUMBER ?? 'local';
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? environment;
-
-  if (isNativeReleaseBuild && !mapsApiKey) {
-    throw new Error(
-      'GOOGLE_MAPS_API_KEY is required for preview and production Android builds.',
-    );
-  }
 
   return {
     ...baseConfig,
@@ -56,12 +48,7 @@ export function createExpoConfig(baseConfig: Partial<ExpoConfig>): ExpoConfig {
     },
     plugins: [
       'expo-router',
-      [
-        'react-native-maps',
-        {
-          androidGoogleMapsApiKey: mapsApiKey ?? '',
-        },
-      ],
+      '@maplibre/maplibre-react-native',
       [
         'expo-location',
         {
@@ -93,7 +80,7 @@ export function createExpoConfig(baseConfig: Partial<ExpoConfig>): ExpoConfig {
     extra: {
       ...baseConfig.extra,
       appEnvironment: environment,
-      mapsConfigured: Boolean(mapsApiKey),
+      mapProvider: 'maplibre-openfreemap',
       releaseProvenance: {
         gitCommitSha,
         buildNumber,

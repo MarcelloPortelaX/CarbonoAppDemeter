@@ -1,24 +1,33 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import {
+  Camera,
+  GeoJSONSource,
+  Layer,
+  Map,
+  type CameraRef,
+  type LngLatBounds,
+  type PressEvent,
+  type ViewStateChangeEvent,
+} from '@maplibre/maplibre-react-native';
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, {
-  MapPressEvent,
-  MapType,
-  Marker,
-  Polygon,
-  PROVIDER_GOOGLE,
-  Region,
-} from 'react-native-maps';
+import type { FeatureCollection, LineString, Point, Polygon } from 'geojson';
+import {
+  ActivityIndicator,
+  Alert,
+  type NativeSyntheticEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { NeonButton } from '../../../src/components/NeonButton';
 import { Screen } from '../../../src/components/Screen';
 import { usePropertyStore } from '../../../src/state/propertyStore';
 import { useDemeterTheme } from '../../../src/theme/ThemeProvider';
 import { areaHectares, hasSelfIntersection, perimeterMeters } from '../../../src/utils/geo';
-import { darkMapStyle } from '../../../src/utils/mapStyles';
 
 const DEFAULT_REGION = {
   latitude: -21.2264,
@@ -27,25 +36,77 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.035,
 };
 const MAP_LOAD_TIMEOUT_MS = 12_000;
+const MAP_STYLES = {
+  streets: 'https://tiles.openfreemap.org/styles/liberty',
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+} as const;
 
 type MapLoadStatus = 'loading' | 'ready' | 'unavailable';
+type MapStyle = keyof typeof MAP_STYLES;
+
+function regionToZoom(longitudeDelta: number) {
+  return Math.max(2, Math.min(20, Math.log2(360 / Math.max(longitudeDelta, 0.00001))));
+}
+
+function getBoundaryBounds(boundary: { latitude: number; longitude: number }[]): LngLatBounds {
+  const longitudes = boundary.map((point) => point.longitude);
+  const latitudes = boundary.map((point) => point.latitude);
+  return [
+    Math.min(...longitudes),
+    Math.min(...latitudes),
+    Math.max(...longitudes),
+    Math.max(...latitudes),
+  ];
+}
+
+function createBoundaryGeoJson(
+  boundary: { latitude: number; longitude: number }[],
+): FeatureCollection<Polygon | LineString | Point> {
+  const coordinates = boundary.map((point) => [point.longitude, point.latitude] as [number, number]);
+  const features: FeatureCollection<Polygon | LineString | Point>['features'] = [];
+
+  if (coordinates.length >= 3) {
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'polygon' },
+      geometry: { type: 'Polygon', coordinates: [[...coordinates, coordinates[0]!]] },
+    });
+  }
+
+  if (coordinates.length >= 2) {
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'line' },
+      geometry: {
+        type: 'LineString',
+        coordinates: coordinates.length >= 3 ? [...coordinates, coordinates[0]!] : coordinates,
+      },
+    });
+  }
+
+  coordinates.forEach((coordinate, index) => {
+    features.push({
+      type: 'Feature',
+      properties: { kind: 'vertex', index },
+      geometry: { type: 'Point', coordinates: coordinate },
+    });
+  });
+
+  return { type: 'FeatureCollection', features };
+}
 
 export default function PropertyMap() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { theme } = useDemeterTheme();
-  const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<CameraRef>(null);
   const properties = usePropertyStore((state) => state.properties);
   const addBoundaryPoint = usePropertyStore((state) => state.addBoundaryPoint);
   const undoBoundaryPoint = usePropertyStore((state) => state.undoBoundaryPoint);
   const confirmBoundary = usePropertyStore((state) => state.confirmBoundary);
   const updateMapViewport = usePropertyStore((state) => state.updateMapViewport);
-  const nativeMapsConfigured = Constants.expoConfig?.extra?.mapsConfigured === true;
-  const canAttemptMap = nativeMapsConfigured || __DEV__;
-  const [mapType, setMapType] = useState<MapType>('hybrid');
+  const [mapStyle, setMapStyle] = useState<MapStyle>(theme.mode === 'dark' ? 'dark' : 'streets');
   const [mapInstance, setMapInstance] = useState(0);
-  const [mapStatus, setMapStatus] = useState<MapLoadStatus>(
-    canAttemptMap ? 'loading' : 'unavailable',
-  );
+  const [mapStatus, setMapStatus] = useState<MapLoadStatus>('loading');
   const property = properties.find((candidate) => candidate.id === id);
   const boundary = property?.boundary ?? [];
   const area = boundary.length ? areaHectares(boundary) : property?.areaHa ?? 0;
@@ -56,6 +117,7 @@ export default function PropertyMap() {
     (boundary[0]
       ? { ...boundary[0], latitudeDelta: 0.035, longitudeDelta: 0.035 }
       : DEFAULT_REGION);
+  const boundaryGeoJson = createBoundaryGeoJson(boundary);
 
   useEffect(() => {
     if (mapStatus !== 'loading') return undefined;
@@ -67,24 +129,32 @@ export default function PropertyMap() {
     return () => clearTimeout(timeout);
   }, [mapInstance, mapStatus]);
 
-  const handleMapPress = (event: MapPressEvent) => {
+  const handleMapPress = (event: NativeSyntheticEvent<PressEvent>) => {
     if (property) {
-      addBoundaryPoint(property.id, event.nativeEvent.coordinate);
+      const [longitude, latitude] = event.nativeEvent.lngLat;
+      addBoundaryPoint(property.id, { latitude, longitude });
     }
   };
 
-  const handleRegionChangeComplete = (region: Region) => {
+  const handleRegionChangeComplete = (event: NativeSyntheticEvent<ViewStateChangeEvent>) => {
     if (property) {
-      updateMapViewport(property.id, region);
+      const [longitude, latitude] = event.nativeEvent.center;
+      const [west, south, east, north] = event.nativeEvent.bounds;
+      updateMapViewport(property.id, {
+        latitude,
+        longitude,
+        latitudeDelta: Math.abs(north - south),
+        longitudeDelta: Math.abs(east - west),
+      });
     }
   };
 
   const fitBoundary = (animated = true) => {
     if (boundary.length < 2) return;
 
-    mapRef.current?.fitToCoordinates(boundary, {
-      edgePadding: { top: 120, right: 80, bottom: 320, left: 80 },
-      animated,
+    cameraRef.current?.fitBounds(getBoundaryBounds(boundary), {
+      padding: { top: 120, right: 80, bottom: 320, left: 80 },
+      duration: animated ? 400 : 0,
     });
   };
 
@@ -110,15 +180,11 @@ export default function PropertyMap() {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      mapRef.current?.animateToRegion(
-        {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.018,
-          longitudeDelta: 0.018,
-        },
-        400,
-      );
+      cameraRef.current?.easeTo({
+        center: [location.coords.longitude, location.coords.latitude],
+        zoom: 15,
+        duration: 400,
+      });
     } catch {
       Alert.alert(
         'Localização indisponível',
@@ -128,7 +194,6 @@ export default function PropertyMap() {
   };
 
   const retryMap = () => {
-    if (!canAttemptMap) return;
     setMapStatus('loading');
     setMapInstance((current) => current + 1);
   };
@@ -190,43 +255,62 @@ export default function PropertyMap() {
       </View>
 
       <View style={styles.mapWrap}>
-        <MapView
+        <Map
           key={mapInstance}
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
-          mapType={mapType}
-          customMapStyle={theme.mode === 'dark' ? darkMapStyle : []}
-          initialRegion={initialRegion}
-          loadingEnabled
-          onMapLoaded={handleMapLoaded}
+          mapStyle={MAP_STYLES[mapStyle]}
+          androidView="texture"
+          attribution
+          attributionPosition={{ bottom: 310, left: 8 }}
+          logo={false}
+          compass
+          compassPosition={{ top: 76, right: 16 }}
+          onWillStartLoadingMap={() => setMapStatus('loading')}
+          onDidFinishLoadingMap={handleMapLoaded}
+          onDidFailLoadingMap={() => setMapStatus('unavailable')}
           onPress={handleMapPress}
-          onRegionChangeComplete={handleRegionChangeComplete}
+          onRegionDidChange={handleRegionChangeComplete}
           accessibilityLabel="Mapa para delimitar a propriedade"
         >
-          {boundary.length >= 2 && (
-            <Polygon
-              coordinates={boundary}
-              strokeColor={theme.brand.neon}
-              fillColor={`${theme.brand.neon}22`}
-              strokeWidth={4}
+          <Camera
+            ref={cameraRef}
+            initialViewState={{
+              center: [initialRegion.longitude, initialRegion.latitude],
+              zoom: regionToZoom(initialRegion.longitudeDelta),
+            }}
+          />
+          <GeoJSONSource id="property-boundary" data={boundaryGeoJson}>
+            <Layer
+              id="property-boundary-fill"
+              type="fill"
+              filter={['==', ['get', 'kind'], 'polygon']}
+              paint={{
+                'fill-color': theme.brand.neon,
+                'fill-opacity': 0.16,
+              }}
             />
-          )}
-          {boundary.map((point, index) => (
-            <Marker
-              key={`${point.latitude}-${point.longitude}-${index}`}
-              coordinate={point}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View
-                style={[
-                  styles.vertex,
-                  { borderColor: theme.brand.neon, backgroundColor: theme.colors.surface },
-                ]}
-              />
-            </Marker>
-          ))}
-        </MapView>
+            <Layer
+              id="property-boundary-line"
+              type="line"
+              filter={['==', ['get', 'kind'], 'line']}
+              paint={{
+                'line-color': theme.brand.neon,
+                'line-width': 4,
+              }}
+            />
+            <Layer
+              id="property-boundary-vertices"
+              type="circle"
+              filter={['==', ['get', 'kind'], 'vertex']}
+              paint={{
+                'circle-color': theme.colors.surface,
+                'circle-radius': 7,
+                'circle-stroke-color': theme.brand.neon,
+                'circle-stroke-width': 3,
+              }}
+            />
+          </GeoJSONSource>
+        </Map>
 
         {theme.mode === 'dark' && (
           <View
@@ -240,24 +324,20 @@ export default function PropertyMap() {
 
         <View style={styles.chips}>
           <Chip
-            icon="image-outline"
-            label="Satélite"
-            active={mapType === 'hybrid'}
-            onPress={() => setMapType('hybrid')}
+            icon="map-outline"
+            label="Ruas"
+            active={mapStyle === 'streets'}
+            onPress={() => setMapStyle('streets')}
           />
           <Chip
-            icon="map-outline"
-            label="Mapa"
-            active={mapType === 'standard'}
-            onPress={() => setMapType('standard')}
+            icon="weather-night"
+            label="Escuro"
+            active={mapStyle === 'dark'}
+            onPress={() => setMapStyle('dark')}
           />
         </View>
 
-        <MapStatusBanner
-          status={mapStatus}
-          configured={canAttemptMap}
-          onRetry={retryMap}
-        />
+        <MapStatusBanner status={mapStatus} onRetry={retryMap} />
 
         <View style={styles.controls}>
           <MapControl
@@ -366,19 +446,16 @@ export default function PropertyMap() {
 
 interface MapStatusBannerProps {
   status: MapLoadStatus;
-  configured: boolean;
   onRetry: () => void;
 }
 
-function MapStatusBanner({ status, configured, onRetry }: MapStatusBannerProps) {
+function MapStatusBanner({ status, onRetry }: MapStatusBannerProps) {
   const { theme } = useDemeterTheme();
 
   if (status === 'ready') return null;
 
   const isLoading = status === 'loading';
-  const message = configured
-    ? 'Os tiles não carregaram. Verifique sua conexão e tente novamente.'
-    : 'O provedor de mapa não foi configurado nesta versão do aplicativo.';
+  const message = 'O mapa não carregou. Verifique sua conexão e tente novamente.';
 
   return (
     <View
@@ -400,7 +477,7 @@ function MapStatusBanner({ status, configured, onRetry }: MapStatusBannerProps) 
       <Text style={[styles.mapStatusText, { color: theme.colors.text }]}>
         {isLoading ? 'Carregando mapa…' : message}
       </Text>
-      {!isLoading && configured && (
+      {!isLoading && (
         <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
           <Text style={[styles.retryText, { color: theme.brand.neon }]}>Tentar novamente</Text>
         </Pressable>
@@ -575,12 +652,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 8,
     elevation: 4,
-  },
-  vertex: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 3,
   },
   sheet: {
     position: 'absolute',
