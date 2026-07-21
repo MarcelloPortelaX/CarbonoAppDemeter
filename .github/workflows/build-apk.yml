@@ -54,8 +54,15 @@ jobs:
 
       - name: Build APK locally (prebuild + gradlew)
         working-directory: apps/mobile
+        env:
+          APP_ENV: preview
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           mkdir -p dist
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "Error: GOOGLE_MAPS_API_KEY is required for the preview APK."
+            exit 1
+          fi
           export CI=1
           npx expo prebuild --platform android --clean
           cd android

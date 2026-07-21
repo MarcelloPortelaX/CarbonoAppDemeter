@@ -11,6 +11,8 @@ __pycache__/
 *.pyo
 .venv/
 .env
+.env.*
+!.env.example
 *.egg-info/
 .mypy_cache/
 .ruff_cache/
@@ -21,8 +23,6 @@ __pycache__/
 *.sqlite
 
 # Secrets
-.env.local
-.env.production
 *.pem
 *.key
 *.p12

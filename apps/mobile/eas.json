@@ -7,7 +7,11 @@
     "development": {
       "node": "22.13.0",
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_APP_ENV": "development"
+      }
     },
     "preview": {
       "node": "22.13.0",
@@ -16,6 +20,7 @@
         "buildType": "apk"
       },
       "env": {
+        "APP_ENV": "preview",
         "EXPO_PUBLIC_APP_ENV": "preview"
       }
     },
@@ -26,6 +31,7 @@
         "buildType": "app-bundle"
       },
       "env": {
+        "APP_ENV": "production",
         "EXPO_PUBLIC_APP_ENV": "production"
       }
     }
